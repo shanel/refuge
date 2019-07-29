@@ -1,5 +1,6 @@
 import lottery
 
+
 class PercentageUser(lottery.BaseUser):
     def __init__(self, name):
         self.name = name
@@ -22,5 +23,3 @@ class PercentageUser(lottery.BaseUser):
 
     def get_rank(self):
         return self.percentage()
-
-

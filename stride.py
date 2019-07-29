@@ -56,5 +56,3 @@ class StrideUser(lottery.BaseUser):
 
     def get_rank(self):
         return self.pass_count
-
-

@@ -4,11 +4,16 @@ import lottery
 import percentage
 import stride
 
+
 def do_nothing():
     pass
 
+
 def main():
-    types = {"stride": stride.StrideUser, "percentage": percentage.PercentageUser}
+    types = {
+        "stride": stride.StrideUser,
+        "percentage": percentage.PercentageUser
+    }
     finals = {"stride": stride.update_global_pass, "percentage": do_nothing}
     for kind, user_type in types.items():
         print(kind)
@@ -29,8 +34,12 @@ def main():
                     i = alphabet.pop()
                     users[i] = user_type(i)
             for _ in range(5):
-                lottery.run_a_lottery_with_random_users(users, 7, 4,
-                                                random.sample(users.keys(), 4), final=finals[kind])
+                lottery.run_a_lottery_with_random_users(users,
+                                                        7,
+                                                        4,
+                                                        random.sample(
+                                                            users.keys(), 4),
+                                                        final=finals[kind])
 
         total = 0
         for k, v in users.items():

@@ -1,6 +1,7 @@
 import abc
 import random
 
+
 class BaseUser(metaclass=abc.ABCMeta):
     """Represents the data necessary for a user to participate in lotteries."""
     @abc.abstractmethod
@@ -60,4 +61,3 @@ def run_a_lottery_with_random_users(users,
     if final != None:
         final()
     return winners
-
