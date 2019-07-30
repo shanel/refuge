@@ -15,30 +15,44 @@ def main():
         "percentage": percentage.PercentageUser
     }
     finals = {"stride": stride.update_global_pass, "percentage": do_nothing}
+
+    # Create alphabet list of uppercase letters
+    alphabet = []
+    for letter in range(65, 91):
+        alphabet.append(chr(letter))
+
+    chunks = [alphabet[:10]]
+    sub_alphabet = alphabet[10:]
+
+    while len(sub_alphabet) > 0:
+        chunk = []
+        for _ in range(random.randint(1, 5)):
+            if len(sub_alphabet) > 0:
+                chunk.append(sub_alphabet.pop(0))
+        chunks.append(chunk)
+
+    repeat = False
+
+    abstensions = []
+
     for kind, user_type in types.items():
         print(kind)
         users = {}
+        abs_copy = abstensions[:]
 
-        # Create alphabet list of uppercase letters
-        alphabet = []
-        for letter in range(65, 91):
-            alphabet.append(chr(letter))
-
-        for _ in range(10):
-            i = alphabet.pop(0)
-            users[i] = user_type(i)
-
-        while len(alphabet) > 0:
-            for _ in range(random.randint(1, 5)):
-                if len(alphabet) > 0:
-                    i = alphabet.pop()
-                    users[i] = user_type(i)
+        for chunk in chunks:
+            for a in chunk:
+                users[a] = user_type(a)
             for _ in range(5):
+                if not repeat:
+                    ab = random.sample(users.keys(), 3)
+                    abstensions.append(ab)
+                else:
+                    ab = abs_copy.pop(0)
                 lottery.run_a_lottery_with_random_users(users,
                                                         7,
                                                         4,
-                                                        random.sample(
-                                                            users.keys(), 4),
+                                                        ab,
                                                         final=finals[kind])
 
         total = 0
@@ -56,6 +70,7 @@ def main():
 
         print(avg)
         print(dev_total / len(users.keys()))
+        repeat = True
 
 
 if __name__ == "__main__":
