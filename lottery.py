@@ -32,9 +32,16 @@ def run_a_single_lottery_draw(users, ticket_holders):
         holder_passes[holder] = users[holder].get_rank()
 
     # Sorted list of holders ordered by pass count
-    sorted_holders = sorted(holder_passes.items(), key=lambda kv: kv[1])
-
-    return sorted_holders[0][0]
+    sorted_holders = sorted(holder_passes.items(), key=lambda kv: (kv[1], kv[0]))
+    to_return = []
+    check_for = sorted_holders[0][1]
+    for h in sorted_holders:
+        if check_for == h[1]:
+            to_return.append(h)
+    if len(to_return) == 1:
+        return to_return[0][0]
+    else:
+        return random.choice(to_return)[0]
 
 
 def run_a_lottery_with_random_users(users,
