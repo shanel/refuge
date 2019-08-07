@@ -11,11 +11,12 @@ app = flask.Flask(__name__)
 # can only be called by the binary itself.
 
 
-# For the real stuff
+# For the real stuff I think we'll need to pass in the project id?
 def create_client(project_id):
     return datastore.Client(project_id)
 
 
+# This should probably eventually just accept a dict.
 def add_player(client, name):
     key = client.key('player')
 
@@ -28,36 +29,36 @@ def add_player(client, name):
     client.put(player)
 
 
-@app.route('/player/create', methods=['POST'])
+@app.route('/players', methods=['POST', 'GET'])
 def create_new_player():
-    playername = flask.request.form.get('name')
-    if playername == None:
-        return 'name field missing', 400, {
-            'Content-Type': 'text/plain; charset=utf-8'
-        }
-    else:
-        client = datastore.Client()
-        query = client.query(kind='player')
-        # Ideally we'd use add_filter to find the right name, but in the dev
-        # environment there is no index.
-        res = None
-        results = query.fetch()
-        for r in results:
-            if r['name'] == playername:
-                res = True
-                break
-        if not res:
-            add_player(client, playername)
-        return flask.redirect(
-            flask.url_for('show_player_profile', playername=playername))
+    if flask.request.method == 'POST':
+        playername = flask.request.form.get('name')
+        if playername == None:
+            return 'name field missing', 400, {
+                'Content-Type': 'text/plain; charset=utf-8'
+            }
+        else:
+            client = datastore.Client()
+            query = client.query(kind='player')
+            # Ideally we'd use add_filter to find the right name, but in the dev
+            # environment there is no index.
+            res = None
+            results = query.fetch()
+            for r in results:
+                if r['name'] == playername:
+                    res = True
+                    break
+            if not res:
+                add_player(client, playername)
+            return flask.redirect(
+                flask.url_for('show_player_profile', playername=playername))
+    if flask.request.method == 'GET':
+        return 'NOPE', 403, {'Content-Type': 'text/plain; charset=utf-8'}
 
 
-# [START gae_flex_datastore_app]
-@app.route('/player/<playername>')
+@app.route('/players/<playername>')
 def show_player_profile(playername):
     # eventually this should be a singleton for the app
-    ds = datastore.Client()
-    #    ds = create_client('refuge-scheduler')
 
     client = datastore.Client()
     query = client.query(kind='player')
@@ -78,9 +79,6 @@ def show_player_profile(playername):
         return 'no user with name {} found'.format(playername), 404, {
             'Content-Type': 'text/plain; charset=utf-8'
         }
-
-
-# [END gae_flex_datastore_app]
 
 
 @app.errorhandler(500)
