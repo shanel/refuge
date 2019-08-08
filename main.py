@@ -7,13 +7,12 @@ import player
 
 app = flask.Flask(__name__)
 
-app.add_url_rule('/players',
-                 'new',
-                 player.new,
-                 methods=['POST', 'GET'])
-app.add_url_rule('/players/<playername>', 'show_or_update_or_delete',
+app.add_url_rule('/players', 'new', player.new, methods=['POST', 'GET'])
+app.add_url_rule('/players/<playername>',
+                 'show_or_update_or_delete',
                  player.show_or_update_or_delete,
                  methods=['PUT', 'GET', 'DELETE'])
+
 
 @app.errorhandler(500)
 def server_error(e):

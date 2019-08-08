@@ -1,3 +1,5 @@
+import pprint
+
 import flask
 from google.cloud import ndb
 
@@ -12,11 +14,8 @@ class Player(ndb.Model):
     updated = ndb.DateTimeProperty(auto_now=True)
 
 
-# This should probably eventually just accept a dict.
-def add_player(client, name):
-    with client.context() as context:
-        new = Player(name=name)
-        return new.put()
+# TODO(shanel): We *should* probably eventually be using the generated keys for
+# a lot of stuff...
 
 
 def new():
@@ -36,7 +35,8 @@ def new():
                     # One is one too many
                     break
                 if query_length == 0:
-                    np = Player(name=playername)
+                    params = {k: v for k, v in flask.request.form.items() if v}
+                    np = Player(**params)
                     np.put()
 
             # It might be a pre-optimization, but ideally we'd just use the object
@@ -45,7 +45,8 @@ def new():
             # Also, if we try to do a create and a user with that name already
             # exists (eventually) we'll want to return an error, not the data.
             return flask.redirect(
-                flask.url_for('show_or_update_or_delete', playername=playername))
+                flask.url_for('show_or_update_or_delete',
+                              playername=playername))
     if flask.request.method == 'GET':
         return 'NOPE', 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
@@ -62,17 +63,23 @@ def show_or_update_or_delete(playername):
             # There should only be one, so...
             break
         try:
+            player = players[0]
             if flask.request.method == 'DELETE':
-                players[0].key.delete()
+                player.key.delete()
                 return flask.redirect(flask.url_for('new'))
             if flask.request.method == 'PUT':
-                new_name = flask.request.form.get('name')
-                players[0].name = new_name
-                players[0].put()
-            out = 'Player Name: {}\n'.format(players[0].name)
+                # NOTE: This makes the assumption that the form will be filled with
+                # all the current data plus any changes.
+                altered = False
+                for k, v in flask.request.form.items():
+                    if getattr(player, k, None) != None:
+                        altered = True
+                        setattr(player, k, v)
+                if altered:
+                    player.put()
+            out = pprint.PrettyPrinter(indent=4).pformat(player)
             return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
         except IndexError:
             return 'no user with name {} found'.format(playername), 404, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
-
