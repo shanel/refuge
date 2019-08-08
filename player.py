@@ -7,6 +7,7 @@ from google.cloud import ndb
 
 class Player(ndb.Model):
     name = ndb.StringProperty()
+    pronouns = ndb.StringProperty()
     created = ndb.DateTimeProperty(auto_now_add=True)
     updated = ndb.DateTimeProperty(auto_now=True)
 
@@ -44,12 +45,12 @@ def new():
             # Also, if we try to do a create and a user with that name already
             # exists (eventually) we'll want to return an error, not the data.
             return flask.redirect(
-                flask.url_for('show', playername=playername))
+                flask.url_for('show_or_update_or_delete', playername=playername))
     if flask.request.method == 'GET':
-        return 'NOPE', 403, {'Content-Type': 'text/plain; charset=utf-8'}
+        return 'NOPE', 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
 
-def show(playername):
+def show_or_update_or_delete(playername):
     # Assume GOOGLE_APPLICATION_CREDENTIALS is set in environment
     client = ndb.Client()
 
@@ -61,9 +62,17 @@ def show(playername):
             # There should only be one, so...
             break
         try:
+            if flask.request.method == 'DELETE':
+                players[0].key.delete()
+                return flask.redirect(flask.url_for('new'))
+            if flask.request.method == 'PUT':
+                new_name = flask.request.form.get('name')
+                players[0].name = new_name
+                players[0].put()
             out = 'Player Name: {}\n'.format(players[0].name)
             return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
         except IndexError:
             return 'no user with name {} found'.format(playername), 404, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
+

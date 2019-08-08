@@ -16,9 +16,9 @@ def step_impl(context):
 
 @when(u'we pass in the requisite player data')
 def step_impl(context):
-    # Do a POST to /player/create
+    # Do a POST to /players
     url = 'http://localhost:8080/players'
-    resp = requests.post(url=url,data={'name': player_name})
+    resp = requests.post(url=url,data={'name': player_name, 'pronouns': 'he/him'})
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
 
@@ -32,6 +32,9 @@ def step_impl(context):
 
 @given(u'the player exists in the system')
 def step_impl(context):
+    # Make sure it exists by trying to create it then fetching it.
+    url = 'http://localhost:8080/players'
+    resp = requests.post(url=url,data={'name': player_name, 'pronouns': 'he/him'})
     url = 'http://localhost:8080/players/%s' % player_name
     resp = requests.get(url=url)
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
@@ -53,19 +56,28 @@ def step_impl(context):
 
 @when(u'we pass in the fields to be updated for the player')
 def step_impl(context):
-    raise NotImplementedError(u'STEP: When we pass in the fields to be updated for the player')
+    url = 'http://localhost:8080/players/%s' % player_name
+    resp = requests.put(url=url,data={'pronouns': 'they/them'})
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
 
 @then(u'the requested player\'s data is updated accordingly.')
 def step_impl(context):
-    raise NotImplementedError(u'STEP: Then the requested player\'s data is updated accordingly.')
+    url = 'http://localhost:8080/players/%s' % player_name
+    resp = requests.get(url=url)
+    assert (resp.status_code == 200, "want 200; got %d" % resp.status_code and
+            'they/them' in resp.text)
 
 
 @when(u'we request the player be deleted from the system')
 def step_impl(context):
-    raise NotImplementedError(u'STEP: When we request the player be deleted from the system')
+    url = 'http://localhost:8080/players/%s' % player_name
+    resp = requests.delete(url=url,data={'name':player_name})
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
 
 @then(u'the player\'s data is deleted from the system.')
 def step_impl(context):
-    raise NotImplementedError(u'STEP: Then the player\'s data is deleted from the system.')
+    url = 'http://localhost:8080/players/%s' % player_name
+    resp = requests.get(url=url)
+    assert resp.status_code == 404, "want 404; got %d" % resp.status_code
