@@ -16,6 +16,7 @@ class Player(ndb.Model):
 
 def new():
     if flask.request.method == 'POST':
+        # NOTE: This field will become the id for the entity - it can't be changed(?)
         playername = flask.request.form.get('name')
         if playername == None:
             return 'name field missing', 400, {
@@ -24,14 +25,10 @@ def new():
         else:
             client = ndb.Client()
             with client.context() as context:
-                query = Player.query(Player.name == playername)
-                query_length = 0
-                for _ in query:
-                    query_length += 1
-                    # One is one too many
-                    break
-                if query_length == 0:
-                    params = {k: v for k, v in flask.request.form.items() if v}
+                key = ndb.Key('Player', playername)
+                if not key.get():
+                    params = {k: v for k, v in flask.request.form.items() if v and k != 'id'}
+                    params['id'] = playername
                     np = Player(**params)
                     np.put()
 
@@ -52,23 +49,9 @@ def show_or_update_or_delete(playername):
     client = ndb.Client()
 
     with client.context() as context:
-        # Ideally we wouldn't have to do a query every time.
-        # In theory we could just have the username be the unique id:
-        # https://cloud.google.com/appengine/docs/standard/python/ndb/creating-entity-keys#specifying_your_own_key_name
-        # But that would require the url to be forever locked. Obvs we'll
-        # let them set their display name to whatever they want whenever,
-        # but the url they visit will be static... Or maybe we just create
-        # that for them ala SomeParticularlyFunnyAnimalName... Though if
-        # they get one they don't like they are kinda stuck. Maybe let them
-        # cycle through?
-        query = Player.query(Player.name == playername)
-        players = []
-        for i in query:
-            players.append(i)
-            # There should only be one, so...
-            break
-        try:
-            player = players[0]
+        key = ndb.Key('Player', playername)
+        player = key.get()
+        if player:
             if flask.request.method == 'DELETE':
                 player.key.delete()
                 return flask.redirect(flask.url_for('new'))
@@ -77,6 +60,8 @@ def show_or_update_or_delete(playername):
                 # all the current data plus any changes.
                 altered = False
                 for k, v in flask.request.form.items():
+                    if k == 'id':
+                        continue
                     if getattr(player, k, None) != None:
                         altered = True
                         setattr(player, k, v)
@@ -84,7 +69,7 @@ def show_or_update_or_delete(playername):
                     player.put()
             out = pprint.PrettyPrinter(indent=4).pformat(player)
             return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
-        except IndexError:
+        else:
             return 'no user with name {} found'.format(playername), 404, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
