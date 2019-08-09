@@ -14,10 +14,6 @@ class Player(ndb.Model):
     updated = ndb.DateTimeProperty(auto_now=True)
 
 
-# TODO(shanel): We *should* probably eventually be using the generated keys for
-# a lot of stuff...
-
-
 def new():
     if flask.request.method == 'POST':
         playername = flask.request.form.get('name')
