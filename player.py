@@ -52,6 +52,15 @@ def show_or_update_or_delete(playername):
     client = ndb.Client()
 
     with client.context() as context:
+        # Ideally we wouldn't have to do a query every time.
+        # In theory we could just have the username be the unique id:
+        # https://cloud.google.com/appengine/docs/standard/python/ndb/creating-entity-keys#specifying_your_own_key_name
+        # But that would require the url to be forever locked. Obvs we'll
+        # let them set their display name to whatever they want whenever,
+        # but the url they visit will be static... Or maybe we just create
+        # that for them ala SomeParticularlyFunnyAnimalName... Though if
+        # they get one they don't like they are kinda stuck. Maybe let them
+        # cycle through?
         query = Player.query(Player.name == playername)
         players = []
         for i in query:
