@@ -18,7 +18,7 @@ def step_impl(context):
 def step_impl(context):
     # Do a POST to /communities
     url = 'http://localhost:8080/communities'
-    resp = requests.post(url=url,data={'name': community_name, 'pronouns': 'he/him'})
+    resp = requests.post(url=url,data={'name': community_name, 'policies': 'we-have-them'})
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
 
@@ -34,7 +34,7 @@ def step_impl(context):
 def step_impl(context):
     # Make sure it exists by trying to create it then fetching it.
     url = 'http://localhost:8080/communities'
-    resp = requests.post(url=url,data={'name': community_name, 'pronouns': 'he/him'})
+    resp = requests.post(url=url,data={'name': community_name, 'policies': 'we-have-them'})
     url = 'http://localhost:8080/%s' % community_name
     resp = requests.get(url=url)
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
@@ -57,7 +57,7 @@ def step_impl(context):
 @when(u'we pass in the fields to be updated for the community')
 def step_impl(context):
     url = 'http://localhost:8080/%s' % community_name
-    resp = requests.put(url=url,data={'pronouns': 'they/them'})
+    resp = requests.put(url=url,data={'policies': 'we-have-more'})
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
 
@@ -65,7 +65,7 @@ def step_impl(context):
 def step_impl(context):
     url = 'http://localhost:8080/%s' % community_name
     resp = requests.get(url=url)
-    assert resp.status_code == 200, "want 200; got %d" % resp.status_code and 'they/them' in resp.text
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code and 'we-have-more' in resp.text
 
 
 @when(u'we request the community be deleted from the system')

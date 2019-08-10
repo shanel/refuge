@@ -9,7 +9,7 @@ from google.cloud import ndb
 
 class Community(ndb.Model):
     name = ndb.StringProperty()
-    pronouns = ndb.StringProperty()
+    policies = ndb.StringProperty()
     created = ndb.DateTimeProperty(auto_now_add=True)
     updated = ndb.DateTimeProperty(auto_now=True)
 
