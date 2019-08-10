@@ -3,13 +3,19 @@ import socket
 
 import flask
 
+import community
 import player
 
 app = flask.Flask(__name__)
 
-app.add_url_rule('/players', 'new', player.new, methods=['POST', 'GET'])
+app.add_url_rule('/communities', 'community.new', community.new, methods=['POST', 'GET'])
+app.add_url_rule('/<communityname>',
+                 'community.show_or_update_or_delete',
+                 community.show_or_update_or_delete,
+                 methods=['PUT', 'GET', 'DELETE'])
+app.add_url_rule('/players', 'player.new', player.new, methods=['POST', 'GET'])
 app.add_url_rule('/players/<playername>',
-                 'show_or_update_or_delete',
+                 'player.show_or_update_or_delete',
                  player.show_or_update_or_delete,
                  methods=['PUT', 'GET', 'DELETE'])
 
