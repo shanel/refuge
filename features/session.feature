@@ -1,4 +1,4 @@
-Feature: Session Creation
+Feature: Session CRUD
 
 	Scenario: Create a barebones session
 		Given the session does not currenty exist in the system
@@ -19,3 +19,4 @@ Feature: Session Creation
 		Given the session exists in the system
 		When we request the session be deleted from the system
 		Then the session's data is deleted from the system.
+

@@ -12,10 +12,28 @@ class Session(ndb.Model):
     name = ndb.StringProperty()
     # TODO(shanel): In theory this should be an int but all the data comes
     # in from the post as a string... Later we can do the needful and make
-    # specific things into ints before sticking them int.
+    # specific things into ints before sticking them into the datastore.
     max_players = ndb.StringProperty()
+    min_players = ndb.StringProperty()
+    # list of people signed up for lottery
+    lottery_participants = ndb.JsonProperty()
+    # when the lottery should happen
+    lottery_scheduled_for = ndb.DateTimeProperty()
+    # when lottery happened
+    lottery_occurred_at = ndb.DateTimeProperty()
+    # datetime of the session
+    starts_at = ndb.DateTimeProperty()
+    # list of people in the session
+    players = ndb.JsonProperty()
+    # list of people on the waitlist
+    waitlisted_players = ndb.JsonProperty()
+    created_by = ndb.StringProperty()
+    other_sessions_in_series = ndb.JsonProperty()
+    give_preference_to_those_who_can_attend_most_sessions = ndb.BooleanProperty()
     created = ndb.DateTimeProperty(auto_now_add=True)
     updated = ndb.DateTimeProperty(auto_now=True)
+
+    # How to handle series and the neccesary lottery tweaks?
 
 
 def new(communityname):

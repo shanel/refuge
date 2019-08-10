@@ -1,4 +1,4 @@
-Feature: Player Creation
+Feature: Player CRUD
 
 	Scenario: Create a barebones player
 		Given the player does not currenty exist in the system

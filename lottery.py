@@ -45,7 +45,8 @@ def run_a_single_lottery_draw(users, ticket_holders):
         return random.choice(to_return)[0]
 
 
-def run_a_lottery_with_random_users(users,
+def run_a_lottery_with_random_users(lottery,
+                                    users,
                                     holder_count,
                                     slots,
                                     but_not=None,
@@ -57,13 +58,13 @@ def run_a_lottery_with_random_users(users,
     holders = random.sample(viable, holder_count)
     original_holders = holders
     for h in holders:
-        users[h].enter_lottery()
+        users[h].enter_lottery(lottery)
     for i in range(slots):
         winner = run_a_single_lottery_draw(users, holders)
         holders.remove(winner)
         winners += winner
     for winner in winners:
-        users[winner].win_lottery()
+        users[winner].win_lottery(lottery)
     for h in original_holders:
         users[h].exit_lottery()
     if final != None:

@@ -13,6 +13,21 @@ class Player(ndb.Model):
     created = ndb.DateTimeProperty(auto_now_add=True)
     updated = ndb.DateTimeProperty(auto_now=True)
 
+    # A lot of these could feasibly be figured out via a query and minimize
+    # record keeping. Might be a cost ($$$) tradeoff there.
+    #
+    # lotteries signed up for
+    lotteries_signed_up_for = ndb.JsonProperty()
+    lotteries_participated_in = ndb.JsonProperty()
+    # lotteries won
+    lotteries_won = ndb.JsonProperty()
+    # games attended
+    sessions_played_in = ndb.JsonProperty()
+    # games dropped
+    sessions_dropped = ndb.JsonProperty()
+    # games waitlisted for
+    sessions_waitlisted_for = ndb.JsonProperty()
+
 
 def new():
     if flask.request.method == 'POST':

@@ -1,4 +1,4 @@
-Feature: Community Creation
+Feature: Community CRUD
 
 	Scenario: Create a barebones community
 		Given the community does not currenty exist in the system

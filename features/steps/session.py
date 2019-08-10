@@ -92,3 +92,42 @@ def step_impl(context):
     url = 'http://localhost:8080/%s/sessions/%s' % (community_name, session_name)
     resp = requests.get(url=url)
     assert resp.status_code == 404, "want 404; got %d" % resp.status_code
+
+@given(u'the lottery has not run yet')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Given the lottery has not run yet')
+
+
+@given(u'the lottery was scheduled for 15 minutes ago')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Given the lottery was scheduled for 15 minutes ago')
+
+
+@given(u'there are {num} participants in the lottery')
+def step_impl(context, num):
+    raise NotImplementedError(u'STEP: Given there are 7 participants in the lottery')
+
+
+@given(u'there is a minimum of {minimum} players')
+def step_impl(context, minimum):
+    raise NotImplementedError(u'STEP: Given there is a minimum of 2 players')
+
+
+@given(u'there is a maximum of {maximum} players')
+def step_impl(context, maximum):
+    raise NotImplementedError(u'STEP: Given there is a maximum of 4 players')
+
+
+@when(u'we run the lottery')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: When we run the lottery')
+
+
+@then(u'there are {players} players in the session')
+def step_impl(context, players):
+    raise NotImplementedError(u'STEP: Then there are 4 players in the session')
+
+
+@then(u'there are {players} players on the session\'s waitlist')
+def step_impl(context, players):
+    raise NotImplementedError(u'STEP: Then there are 3 players on the session\'s waitlist')

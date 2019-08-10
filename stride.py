@@ -30,28 +30,28 @@ class StrideUser(lottery.BaseUser):
         self.tickets = tickets
         self.pass_count = global_pass
         self.remain = self.stride()
-        self.attempts = 0.0
-        self.wins = 0.0
+        self.attempts = []
+        self.wins = []
 
     def stride(self):
         return STRIDE1 / self.tickets
 
     def percentage(self):
-        if self.attempts == 0:
+        if len(self.attempts) == 0:
             return 0
-        return self.wins / self.attempts
+        return float(len(self.wins)) / float(len(self.attempts))
 
-    def enter_lottery(self):
+    def enter_lottery(self, lottery):
         self.pass_count = global_pass + self.remain
-        self.attempts += 1.0
+        self.attempts.append(lottery)
         update_global_tickets(self.tickets)
 
     def exit_lottery(self):
         self.remain = self.pass_count - global_pass
         update_global_tickets(-1.0 * self.tickets)
 
-    def win_lottery(self):
-        self.wins += 1.0
+    def win_lottery(self, lottery):
+        self.wins.append(lottery)
         self.pass_count = self.stride() / QUANTUM
 
     def get_rank(self):

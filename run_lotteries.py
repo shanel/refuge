@@ -10,6 +10,7 @@ def do_nothing():
 
 
 def main():
+    lottery_number = 0
     types = {
         "stride": stride.StrideUser,
         "percentage": percentage.PercentageUser
@@ -49,17 +50,19 @@ def main():
                     abstensions.append(ab)
                 else:
                     ab = abs_copy.pop(0)
-                lottery.run_a_lottery_with_random_users(users,
+                lottery.run_a_lottery_with_random_users(lottery_number,
+                                                        users,
                                                         7,
                                                         4,
                                                         ab,
                                                         final=finals[kind])
+                lottery_number += 1
 
         total = 0
         for k, v in users.items():
             total += v.percentage() * 100
             print("%s: %d (%d / %d)" %
-                  (k, v.percentage() * 100, v.wins, v.attempts))
+                  (k, v.percentage() * 100, len(v.wins), len(v.attempts)))
 
         print(kind)
         avg = total / len(users.keys())
