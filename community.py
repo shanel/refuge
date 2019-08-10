@@ -72,6 +72,6 @@ def show_or_update_or_delete(communityname):
             out = pprint.PrettyPrinter(indent=4).pformat(community)
             return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
         else:
-            return 'no user with name {} found'.format(communityname), 404, {
+            return 'no community with name {} found'.format(communityname), 404, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
