@@ -36,6 +36,9 @@ class Session(ndb.Model):
     )
     created = ndb.DateTimeProperty(auto_now_add=True)
     updated = ndb.DateTimeProperty(auto_now=True)
+    # These two I see as a dict of user id to timestamp
+    drops = ndb.JsonProperty()
+    moves_from_waitlist = ndb.JsonProperty()
 
     # How to handle series and the neccesary lottery tweaks?
 

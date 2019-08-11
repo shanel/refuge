@@ -30,6 +30,9 @@ class Player(ndb.Model, percentage.PlayerMixIn):
     sessions_dropped = ndb.JsonProperty()
     # games waitlisted for
     sessions_waitlisted_for = ndb.JsonProperty()
+    # These two I see as a dict of session id to timestamp
+    sessions_dropped = ndb.JsonProperty()
+    sessions_via_waitlist = ndb.JsonProperty()
 
     def join_waitlist(self, lottery_id):
         sessions_waitlisted_for = []
