@@ -96,11 +96,10 @@ def new(communityname):
             'Content-Type': 'text/plain; charset=utf-8'
         }
 
+
 # TODO(shanel): We'll need to add to this as things become necessary to test for
 def session_to_dict(session):
-    out = {'name': session.name,
-           'players': [],
-           'waitlisted_players': []}
+    out = {'name': session.name, 'players': [], 'waitlisted_players': []}
     if session.players:
         out['players'] = json.loads(session.players)
     if session.waitlisted_players:
@@ -149,7 +148,7 @@ def run_a_single_lottery_draw(participants):
         participant_ratings[participant.name] = participant.get_rank()
 
     sorted_participant_ids = sorted(participant_ratings.items(),
-                                 key=lambda kv: (kv[1], kv[0]))
+                                    key=lambda kv: (kv[1], kv[0]))
     sorted_participants = []
     for item in sorted_participant_ids:
         for part in participants:
@@ -172,9 +171,7 @@ def run_a_single_lottery_draw(participants):
 def run_a_lottery(communityname, session):
     lottery_id = session.name
     participant_ids = json.loads(session.lottery_participants)
-    participant_keys = [
-        ndb.Key('Player', sid) for sid in participant_ids
-    ]
+    participant_keys = [ndb.Key('Player', sid) for sid in participant_ids]
     participants = ndb.get_multi(participant_keys)
     winner_ids = []
     waitlist_ids = []
@@ -217,11 +214,15 @@ def run_lotteries(communityname):
         community_key = ndb.Key('Community', communityname)
         sessions_with_unrun_lotteries = Session.query(
             Session.lottery_scheduled_for <= datetime.datetime.utcnow(),
-            Session.lottery_occurred_at == None, ancestor=community_key).fetch()
+            Session.lottery_occurred_at == None,
+            ancestor=community_key).fetch()
         for s in sessions_with_unrun_lotteries:
             winner_ids, waitlist_ids = run_a_lottery(communityname, s)
             s.players = json.dumps(winner_ids)
             s.waitlisted_players = json.dumps(waitlist_ids)
             s.lottery_occured_at = datetime.datetime.utcnow()
             s.put()
-    return '{} lotteries run'.format(len(sessions_with_unrun_lotteries)), 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    return '{} lotteries run'.format(
+        len(sessions_with_unrun_lotteries)), 200, {
+            'Content-Type': 'text/plain; charset=utf-8'
+        }

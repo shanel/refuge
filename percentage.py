@@ -30,7 +30,8 @@ class PlayerMixIn():
     def enter_lottery(self, lottery_id):
         lotteries_participated_in = []
         if self.lotteries_participated_in:
-            lotteries_participated_in = json.loads(self.lotteries_participated_in)
+            lotteries_participated_in = json.loads(
+                self.lotteries_participated_in)
         lotteries_participated_in.append(lottery_id)
         self.lotteries_participated_in = json.dumps(lotteries_participated_in)
         # Assuming we only need to do the put at the end of the lottery?
@@ -49,7 +50,8 @@ class PlayerMixIn():
     def get_rank(self):
         lotteries_participated_in = []
         if self.lotteries_participated_in:
-            lotteries_participated_in = json.loads(self.lotteries_participated_in)
+            lotteries_participated_in = json.loads(
+                self.lotteries_participated_in)
         if len(lotteries_participated_in) == 0:
             return 0.0
         lotteries_won = []
