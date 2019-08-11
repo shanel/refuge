@@ -93,6 +93,17 @@ def new(communityname):
             'Content-Type': 'text/plain; charset=utf-8'
         }
 
+# TODO(shanel): We'll need to add to this as things become necessary to test for
+def session_to_dict(session):
+    out = {'name': session.name,
+           'players': [],
+           'waitlisted_players': []}
+    if session.players:
+        out['players'] = json.loads(session.players)
+    if session.waitlisted_players:
+        out['waitlisted_players'] = json.loads(session.waitlisted_players)
+    return out
+
 
 def show_or_update_or_delete(communityname, sessionname):
     # Assume GOOGLE_APPLICATION_CREDENTIALS is set in environment
@@ -119,6 +130,8 @@ def show_or_update_or_delete(communityname, sessionname):
                 if altered:
                     session.put()
             out = pprint.PrettyPrinter(indent=4).pformat(session)
+            if 'json' in flask.request.args:
+                out = json.dumps(session_to_dict(session))
             return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
         else:
             return 'no session with name {} found in community {}'.format(
@@ -141,6 +154,8 @@ def run_a_single_lottery_draw(participants):
                 sorted_participants.append((part, item[1]))
                 break
     to_return = []
+    if not sorted_participants:
+        return None
     check_for = sorted_participants[0][1]
     for h in sorted_participants:
         if check_for == h[1]:
@@ -153,7 +168,6 @@ def run_a_single_lottery_draw(participants):
 
 def run_a_lottery(communityname, session):
     lottery_id = session.name
-    slots = int(session.max_players) - int(session.min_players)
     participant_ids = json.loads(session.lottery_participants)
     participant_keys = [
         ndb.Key('Player', sid) for sid in participant_ids
@@ -162,14 +176,16 @@ def run_a_lottery(communityname, session):
     winner_ids = []
     waitlist_ids = []
     original_participants = participants[:]
-    for _ in range(0, slots):
+    for _ in range(0, int(session.max_players)):
         winner = run_a_single_lottery_draw(participants)
-        participants.remove(winner)
-        winner_ids.append(winner.name)
-    for _ in range(0, len(original_participants) - slots):
+        if winner:
+            participants.remove(winner)
+            winner_ids.append(winner.name)
+    for _ in range(0, len(original_participants) - int(session.max_players)):
         insertee = run_a_single_lottery_draw(participants)
-        participants.remove(insertee)
-        waitlist_ids.append(insertee.name)
+        if insertee:
+            participants.remove(insertee)
+            waitlist_ids.append(insertee.name)
     for winner in winner_ids:
         for p in original_participants:
             if winner == p.name:
@@ -203,4 +219,6 @@ def run_lotteries(communityname):
             winner_ids, waitlist_ids = run_a_lottery(communityname, s)
             s.players = json.dumps(winner_ids)
             s.waitlisted_players = json.dumps(waitlist_ids)
+            s.lottery_occured_at = datetime.datetime.utcnow()
+            s.put()
     return '{} lotteries run'.format(len(sessions_with_unrun_lotteries)), 200, {'Content-Type': 'text/plain; charset=utf-8'}

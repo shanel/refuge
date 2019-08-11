@@ -9,6 +9,9 @@ community_name = 'SomeCommunity%d' % int(time.time())
 session_name = 'SomeSession%d' % int(time.time())
 player_name = 'SomePlayer%d' % int(time.time())
 
+lottery_session_name = 'SomeLotterySession'
+lottery_session_counter = 0
+
 @given(u'the session does not currenty exist in the system')
 def step_impl(context):
     # Make sure community exists by trying to create it then fetching it.
@@ -96,8 +99,8 @@ def step_impl(context):
     resp = requests.get(url=url)
     assert resp.status_code == 404, "want 404; got %d" % resp.status_code
 
-@given(u'a lottery was scheduled to run before now with {participants} participants, a minimum of {minimum} players, and a maximum of {maximum} players and has not')
-def step_impl(context, participants, minimum, maximum):
+@given(u'a lottery was scheduled to run before now with {participants} participants and a maximum of {maximum} players and has not')
+def step_impl(context, participants, maximum):
     url = 'http://localhost:8080/communities'
     resp = requests.post(url=url,data={'name': community_name, 'policies': 'we-have-them'})
     url = 'http://localhost:8080/%s' % community_name
@@ -115,11 +118,11 @@ def step_impl(context, participants, minimum, maximum):
         parts.append(new_name)
     # Make sure it exists by trying to create it then fetching it.
     url = 'http://localhost:8080/%s/sessions' % community_name
+    global lottery_session_counter
     resp = requests.post(
             url=url,
-            data={'name': session_name,
+            data={'name': lottery_session_name+str(lottery_session_counter),
                   'max_players': maximum,
-                  'min_players': minimum,
                   'lottery_participants': json.dumps(parts),
                   'lottery_scheduled_for': datetime.datetime.utcnow() - datetime.timedelta(minutes=15)
                  }
@@ -135,9 +138,22 @@ def step_impl(context):
 
 @then(u'there are {players} players in the session')
 def step_impl(context, players):
-    raise NotImplementedError(u'STEP: Then there are 4 players in the session')
+    global lottery_session_counter
+    url = 'http://localhost:8080/%s/sessions/%s?json=true' % (community_name, lottery_session_name+str(lottery_session_counter))
+    resp = requests.get(url=url)
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
+    resp_json = json.loads(resp.text)
+    assert len(resp_json['players']) == int(players), "want %s players enrolled; got %d" % (int(players), len(resp_json['players']))
+
 
 
 @then(u'there are {players} players on the session\'s waitlist')
 def step_impl(context, players):
-    raise NotImplementedError(u'STEP: Then there are 3 players on the session\'s waitlist')
+    global lottery_session_counter
+    url = 'http://localhost:8080/%s/sessions/%s?json=true' % (community_name, lottery_session_name+str(lottery_session_counter))
+    resp = requests.get(url=url)
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
+    resp_json = json.loads(resp.text)
+    assert len(resp_json['waitlisted_players']) == int(players), "want %s players enrolled; got %d" % (int(players), len(resp_json['waitlisted_players']))
+    # NOTE: THIS SHOULD BE DONE AS THE VERY LAST THING OF ANY STEPS TESTING THIS FUNCTIONALITY.
+    lottery_session_counter += 1
