@@ -1,3 +1,5 @@
+import datetime
+import json
 import requests
 import time
 
@@ -5,6 +7,7 @@ from behave import *
 
 community_name = 'SomeCommunity%d' % int(time.time())
 session_name = 'SomeSession%d' % int(time.time())
+player_name = 'SomePlayer%d' % int(time.time())
 
 @given(u'the session does not currenty exist in the system')
 def step_impl(context):
@@ -93,30 +96,35 @@ def step_impl(context):
     resp = requests.get(url=url)
     assert resp.status_code == 404, "want 404; got %d" % resp.status_code
 
-@given(u'the lottery has not run yet')
-def step_impl(context):
-    raise NotImplementedError(u'STEP: Given the lottery has not run yet')
-
-
-@given(u'the lottery was scheduled for 15 minutes ago')
-def step_impl(context):
-    raise NotImplementedError(u'STEP: Given the lottery was scheduled for 15 minutes ago')
-
-
-@given(u'there are {num} participants in the lottery')
-def step_impl(context, num):
-    raise NotImplementedError(u'STEP: Given there are 7 participants in the lottery')
-
-
-@given(u'there is a minimum of {minimum} players')
-def step_impl(context, minimum):
-    raise NotImplementedError(u'STEP: Given there is a minimum of 2 players')
-
-
-@given(u'there is a maximum of {maximum} players')
-def step_impl(context, maximum):
-    raise NotImplementedError(u'STEP: Given there is a maximum of 4 players')
-
+@given(u'a lottery was scheduled to run before now with {participants} participants, a minimum of {minimum} players, and a maximum of {maximum} players and has not')
+def step_impl(context, participants, minimum, maximum):
+    url = 'http://localhost:8080/communities'
+    resp = requests.post(url=url,data={'name': community_name, 'policies': 'we-have-them'})
+    url = 'http://localhost:8080/%s' % community_name
+    resp = requests.get(url=url)
+    assert resp.status_code == 200, "want 200 for community; got %d" % resp.status_code
+    # Create the requisite number of players
+    parts = []
+    for i in range(0, int(participants)):
+        url = 'http://localhost:8080/players'
+        new_name = player_name+str(i)
+        resp = requests.post(url=url,data={'name': new_name})
+        url = 'http://localhost:8080/players/%s' % new_name
+        resp = requests.get(url=url)
+        assert resp.status_code == 200, "want 200; got %d" % resp.status_code
+        parts.append(new_name)
+    # Make sure it exists by trying to create it then fetching it.
+    url = 'http://localhost:8080/%s/sessions' % community_name
+    resp = requests.post(
+            url=url,
+            data={'name': session_name,
+                  'max_players': maximum,
+                  'min_players': minimum,
+                  'lottery_participants': json.dumps(parts),
+                  'lottery_scheduled_for': datetime.datetime.utcnow() - datetime.timedelta(minutes=15)
+                 }
+    )
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
 @when(u'we run the lottery')
 def step_impl(context):

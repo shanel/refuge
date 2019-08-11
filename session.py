@@ -1,3 +1,4 @@
+import datetime
 import pprint
 import time
 
@@ -50,9 +51,15 @@ def new(communityname):
                 if community_key.get():
                     key = ndb.Key('Community', communityname, 'Session', sessionname)
                     if not key.get():
-                        params = {k: v for k, v in flask.request.form.items() if v and k != 'id'}
+                        special = ['id', 'created', 'updated', 'lottery_scheduled_for', 'lottery_occurred_at']
+                        params = {k: v for k, v in flask.request.form.items() if v and k not in special}
+                        # Things we can't just dump right in or want to disallow
                         params['id'] = sessionname
                         np = Session(parent=community_key,**params)
+                        if 'lottery_scheduled_for' in flask.request.form:
+                            np.lottery_scheduled_for = datetime.datetime.strptime(
+                                    # '2019-08-10 21:04:01.217037'
+                                    flask.request.form['lottery_scheduled_for'], '%Y-%m-%d %H:%M:%S.%f')
                         key = np.put()
                 else:
                     return 'could not find community {}'.format(communityname), 404, {'Content-Type': 'text/plain; charset=utf-8'}
@@ -100,3 +107,11 @@ def show_or_update_or_delete(communityname, sessionname):
             return 'no session with name {} found in community {}'.format(sessionname, communityname), 404, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
+
+def run_lotteries(communityname):
+    """Will run all the lotteries that need to be run.
+
+      Args:
+        communityname: the name of the community sessions are being checked for.
+    """
+    pass
