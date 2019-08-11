@@ -27,12 +27,12 @@ class BaseUser(metaclass=abc.ABCMeta):
 
 def run_a_single_lottery_draw(users, ticket_holders):
     # Get pass entries for each holder
-    holder_passes = {}
+    holder_ratings = {}
     for holder in ticket_holders:
-        holder_passes[holder] = users[holder].get_rank()
+        holder_ratings[holder] = users[holder].get_rank()
 
     # Sorted list of holders ordered by pass count
-    sorted_holders = sorted(holder_passes.items(),
+    sorted_holders = sorted(holder_ratings.items(),
                             key=lambda kv: (kv[1], kv[0]))
     to_return = []
     check_for = sorted_holders[0][1]

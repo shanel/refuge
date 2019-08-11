@@ -128,7 +128,9 @@ def step_impl(context, participants, minimum, maximum):
 
 @when(u'we run the lottery')
 def step_impl(context):
-    raise NotImplementedError(u'STEP: When we run the lottery')
+    url = 'http://localhost:8080/%s/lotteries' % community_name
+    resp = requests.get(url=url)
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
 
 @then(u'there are {players} players in the session')

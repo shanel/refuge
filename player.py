@@ -1,13 +1,16 @@
+import json
 import pprint
 
 import flask
 from google.cloud import ndb
 
+import percentage
+
 # TODO(shanel): We'll want to make sure Create/Update/Delete (ie not GET methods)
 # can only be called by the binary itself.
 
 
-class Player(ndb.Model):
+class Player(ndb.Model, percentage.PlayerMixIn):
     name = ndb.StringProperty()
     pronouns = ndb.StringProperty()
     created = ndb.DateTimeProperty(auto_now_add=True)
@@ -28,6 +31,13 @@ class Player(ndb.Model):
     # games waitlisted for
     sessions_waitlisted_for = ndb.JsonProperty()
 
+    def join_waitlist(self, lottery_id):
+        sessions_waitlisted_for = []
+        if self.sessions_waitlisted_for:
+            sessions_waitlisted_for = json.loads(self.sessions_waitlisted_for)
+        sessions_waitlisted_for.append(lottery_id)
+        self.sessions_waitlisted_for = json.dumps(sessions_waitlisted_for)
+
 
 def new():
     if flask.request.method == 'POST':
@@ -43,7 +53,11 @@ def new():
             with client.context() as context:
                 key = ndb.Key('Player', playername)
                 if not key.get():
-                    params = {k: v for k, v in flask.request.form.items() if v and k != 'id'}
+                    params = {
+                        k: v
+                        for k, v in flask.request.form.items()
+                        if v and k != 'id'
+                    }
                     params['id'] = playername
                     np = Player(**params)
                     np.put()

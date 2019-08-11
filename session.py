@@ -1,5 +1,7 @@
 import datetime
+import json
 import pprint
+import random
 import time
 
 import flask
@@ -30,7 +32,8 @@ class Session(ndb.Model):
     waitlisted_players = ndb.JsonProperty()
     created_by = ndb.StringProperty()
     other_sessions_in_series = ndb.JsonProperty()
-    give_preference_to_those_who_can_attend_most_sessions = ndb.BooleanProperty()
+    give_preference_to_those_who_can_attend_most_sessions = ndb.BooleanProperty(
+    )
     created = ndb.DateTimeProperty(auto_now_add=True)
     updated = ndb.DateTimeProperty(auto_now=True)
 
@@ -49,21 +52,32 @@ def new(communityname):
             with client.context() as context:
                 community_key = ndb.Key('Community', communityname)
                 if community_key.get():
-                    key = ndb.Key('Community', communityname, 'Session', sessionname)
+                    key = ndb.Key('Community', communityname, 'Session',
+                                  sessionname)
                     if not key.get():
-                        special = ['id', 'created', 'updated', 'lottery_scheduled_for', 'lottery_occurred_at']
-                        params = {k: v for k, v in flask.request.form.items() if v and k not in special}
+                        special = [
+                            'id', 'created', 'updated',
+                            'lottery_scheduled_for', 'lottery_occurred_at'
+                        ]
+                        params = {
+                            k: v
+                            for k, v in flask.request.form.items()
+                            if v and k not in special
+                        }
                         # Things we can't just dump right in or want to disallow
                         params['id'] = sessionname
-                        np = Session(parent=community_key,**params)
+                        np = Session(parent=community_key, **params)
                         if 'lottery_scheduled_for' in flask.request.form:
                             np.lottery_scheduled_for = datetime.datetime.strptime(
-                                    # '2019-08-10 21:04:01.217037'
-                                    flask.request.form['lottery_scheduled_for'], '%Y-%m-%d %H:%M:%S.%f')
+                                # '2019-08-10 21:04:01.217037'
+                                flask.request.form['lottery_scheduled_for'],
+                                '%Y-%m-%d %H:%M:%S.%f')
                         key = np.put()
                 else:
-                    return 'could not find community {}'.format(communityname), 404, {'Content-Type': 'text/plain; charset=utf-8'}
-
+                    return 'could not find community {}'.format(
+                        communityname), 404, {
+                            'Content-Type': 'text/plain; charset=utf-8'
+                        }
 
             # It might be a pre-optimization, but ideally we'd just use the object
             # to create the page and not do another lookup (lookups cost $)
@@ -75,7 +89,9 @@ def new(communityname):
                               communityname=communityname,
                               sessionname=sessionname))
     if flask.request.method == 'GET':
-        return 'CALENDAR GOES HERE', 200, {'Content-Type': 'text/plain; charset=utf-8'}
+        return 'CALENDAR GOES HERE', 200, {
+            'Content-Type': 'text/plain; charset=utf-8'
+        }
 
 
 def show_or_update_or_delete(communityname, sessionname):
@@ -88,7 +104,8 @@ def show_or_update_or_delete(communityname, sessionname):
         if session:
             if flask.request.method == 'DELETE':
                 session.key.delete()
-                return flask.redirect(flask.url_for('session.new', communityname=communityname))
+                return flask.redirect(
+                    flask.url_for('session.new', communityname=communityname))
             if flask.request.method == 'PUT':
                 # NOTE: This makes the assumption that the form will be filled with
                 # all the current data plus any changes.
@@ -104,9 +121,70 @@ def show_or_update_or_delete(communityname, sessionname):
             out = pprint.PrettyPrinter(indent=4).pformat(session)
             return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
         else:
-            return 'no session with name {} found in community {}'.format(sessionname, communityname), 404, {
-                'Content-Type': 'text/plain; charset=utf-8'
-            }
+            return 'no session with name {} found in community {}'.format(
+                sessionname, communityname), 404, {
+                    'Content-Type': 'text/plain; charset=utf-8'
+                }
+
+
+def run_a_single_lottery_draw(participants):
+    participant_ratings = {}
+    for participant in participants:
+        participant_ratings[participant.name] = participant.get_rank()
+
+    sorted_participant_ids = sorted(participant_ratings.items(),
+                                 key=lambda kv: (kv[1], kv[0]))
+    sorted_participants = []
+    for item in sorted_participant_ids:
+        for part in participants:
+            if item[0] == part.name:
+                sorted_participants.append((part, item[1]))
+                break
+    to_return = []
+    check_for = sorted_participants[0][1]
+    for h in sorted_participants:
+        if check_for == h[1]:
+            to_return.append(h)
+    if len(to_return) == 1:
+        return to_return[0][0]
+    else:
+        return random.choice(to_return)[0]
+
+
+def run_a_lottery(communityname, session):
+    lottery_id = session.name
+    slots = int(session.max_players) - int(session.min_players)
+    participant_ids = json.loads(session.lottery_participants)
+    participant_keys = [
+        ndb.Key('Player', sid) for sid in participant_ids
+    ]
+    participants = ndb.get_multi(participant_keys)
+    winner_ids = []
+    waitlist_ids = []
+    original_participants = participants[:]
+    for _ in range(0, slots):
+        winner = run_a_single_lottery_draw(participants)
+        participants.remove(winner)
+        winner_ids.append(winner.name)
+    for _ in range(0, len(original_participants) - slots):
+        insertee = run_a_single_lottery_draw(participants)
+        participants.remove(insertee)
+        waitlist_ids.append(insertee.name)
+    for winner in winner_ids:
+        for p in original_participants:
+            if winner == p.name:
+                p.win_lottery(lottery_id)
+                # TODO(shanel): This needs to setup the players entries in the session
+    for waiter in waitlist_ids:
+        for p in original_participants:
+            if waiter == p.name:
+                p.join_waitlist(lottery_id)
+    # TODO(shanel): Need to create the waitlist
+    for h in original_participants:
+        p.enter_lottery(lottery_id)
+        h.exit_lottery()
+    return winner_ids, waitlist_ids
+
 
 def run_lotteries(communityname):
     """Will run all the lotteries that need to be run.
@@ -114,4 +192,15 @@ def run_lotteries(communityname):
       Args:
         communityname: the name of the community sessions are being checked for.
     """
-    pass
+    # Get all sessions which have unrun lotteries with lotteries scheduled for before now.
+    client = ndb.Client()
+    with client.context() as context:
+        community_key = ndb.Key('Community', communityname)
+        sessions_with_unrun_lotteries = Session.query(
+            Session.lottery_scheduled_for <= datetime.datetime.utcnow(),
+            Session.lottery_occurred_at == None, ancestor=community_key).fetch()
+        for s in sessions_with_unrun_lotteries:
+            winner_ids, waitlist_ids = run_a_lottery(communityname, s)
+            s.players = json.dumps(winner_ids)
+            s.waitlisted_players = json.dumps(waitlist_ids)
+    return '{} lotteries run'.format(len(sessions_with_unrun_lotteries)), 200, {'Content-Type': 'text/plain; charset=utf-8'}

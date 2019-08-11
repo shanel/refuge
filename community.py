@@ -28,7 +28,11 @@ def new():
             with client.context() as context:
                 key = ndb.Key('Community', communityname)
                 if not key.get():
-                    params = {k: v for k, v in flask.request.form.items() if v and k != 'id'}
+                    params = {
+                        k: v
+                        for k, v in flask.request.form.items()
+                        if v and k != 'id'
+                    }
                     params['id'] = communityname
                     np = Community(**params)
                     np.put()
@@ -72,6 +76,7 @@ def show_or_update_or_delete(communityname):
             out = pprint.PrettyPrinter(indent=4).pformat(community)
             return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
         else:
-            return 'no community with name {} found'.format(communityname), 404, {
-                'Content-Type': 'text/plain; charset=utf-8'
-            }
+            return 'no community with name {} found'.format(
+                communityname), 404, {
+                    'Content-Type': 'text/plain; charset=utf-8'
+                }
