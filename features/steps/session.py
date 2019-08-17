@@ -125,7 +125,7 @@ def step_impl(context, participants, maximum):
                   'max_players': maximum,
                   'lottery_participants': json.dumps(parts),
                   'lottery_scheduled_for': datetime.datetime.utcnow() - datetime.timedelta(minutes=15)
-                 }
+            }
     )
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
@@ -157,3 +157,63 @@ def step_impl(context, players):
     assert len(resp_json['waitlisted_players']) == int(players), "want %s players enrolled; got %d" % (int(players), len(resp_json['waitlisted_players']))
     # NOTE: THIS SHOULD BE DONE AS THE VERY LAST THING OF ANY STEPS TESTING THIS FUNCTIONALITY.
     lottery_session_counter += 1
+
+# Session Drops
+
+@given(u'the session is full')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Given the session is full')
+
+
+@given(u'the session has a waitlist')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Given the session has a waitlist')
+
+
+@when(u'a player drops the session')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: When a player drops the session')
+
+
+@then(u'the first player on the waitlist moves into the session')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Then the first player on the waitlist moves into the session')
+
+
+@then(u'the waitlist has one fewer entries')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Then the waitlist has one fewer entries')
+
+
+@then(u'the dropping player\'s noted as dropping at a specific time')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Then the dropping player\'s noted as dropping at a specific time')
+
+
+@then(u'the promoted player is noted as moving off the waitlist at a specific time')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Then the promoted player is noted as moving off the waitlist at a specific time')
+
+
+@given(u'the session has no waitlist')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Given the session has no waitlist')
+
+
+@then(u'the session is no longer full')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Then the session is no longer full')
+
+
+@then(u'the dropping player is noted as dropping at a specific time')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Then the dropping player is noted as dropping at a specific time')
+
+
+@when(u'a player drops from the waitlist')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: When a player drops from the waitlist')
+
+@then(u'the session is full')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Then the session is full')

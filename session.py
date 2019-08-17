@@ -99,11 +99,13 @@ def new(communityname):
 
 # TODO(shanel): We'll need to add to this as things become necessary to test for
 def session_to_dict(session):
-    out = {'name': session.name, 'players': [], 'waitlisted_players': []}
+    out = {'name': session.name, 'players': [], 'waitlisted_players': [], 'lottery_participants': []}
     if session.players:
         out['players'] = json.loads(session.players)
     if session.waitlisted_players:
         out['waitlisted_players'] = json.loads(session.waitlisted_players)
+    if session.lottery_participants:
+        out['lottery_participants'] = json.loads(session.lottery_participants)
     return out
 
 
@@ -213,6 +215,7 @@ def run_lotteries(communityname):
     with client.context() as context:
         community_key = ndb.Key('Community', communityname)
         sessions_with_unrun_lotteries = Session.query(
+            Session.lottery_scheduled_for != None,
             Session.lottery_scheduled_for <= datetime.datetime.utcnow(),
             Session.lottery_occurred_at == None,
             ancestor=community_key).fetch()
