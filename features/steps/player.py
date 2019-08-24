@@ -5,6 +5,7 @@ from behave import *
 
 player_name = 'SomePlayer%d' % int(time.time())
 
+
 @given(u'the player does not currenty exist in the system')
 def step_impl(context):
     # Do a GET for /player/SomePlayer and get a 404 (as opposed to no perms - eventaully we'll want auth for this
@@ -18,7 +19,11 @@ def step_impl(context):
 def step_impl(context):
     # Do a POST to /players
     url = 'http://localhost:8080/players'
-    resp = requests.post(url=url,data={'name': player_name, 'pronouns': 'he/him'})
+    resp = requests.post(url=url,
+                         data={
+                             'name': player_name,
+                             'pronouns': 'he/him'
+                         })
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
 
@@ -34,7 +39,11 @@ def step_impl(context):
 def step_impl(context):
     # Make sure it exists by trying to create it then fetching it.
     url = 'http://localhost:8080/players'
-    resp = requests.post(url=url,data={'name': player_name, 'pronouns': 'he/him'})
+    resp = requests.post(url=url,
+                         data={
+                             'name': player_name,
+                             'pronouns': 'he/him'
+                         })
     url = 'http://localhost:8080/players/%s' % player_name
     resp = requests.get(url=url)
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
@@ -57,7 +66,7 @@ def step_impl(context):
 @when(u'we pass in the fields to be updated for the player')
 def step_impl(context):
     url = 'http://localhost:8080/players/%s' % player_name
-    resp = requests.put(url=url,data={'pronouns': 'they/them'})
+    resp = requests.put(url=url, data={'pronouns': 'they/them'})
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
 
@@ -71,7 +80,7 @@ def step_impl(context):
 @when(u'we request the player be deleted from the system')
 def step_impl(context):
     url = 'http://localhost:8080/players/%s' % player_name
-    resp = requests.delete(url=url,data={'name':player_name})
+    resp = requests.delete(url=url, data={'name': player_name})
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
 

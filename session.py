@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 import pprint
 import random
 import time
@@ -99,7 +100,13 @@ def new(communityname):
 
 # TODO(shanel): We'll need to add to this as things become necessary to test for
 def session_to_dict(session):
-    out = {'name': session.name, 'players': [], 'waitlisted_players': [], 'lottery_participants': []}
+    out = {
+        'name': session.name,
+        'players': [],
+        'waitlisted_players': [],
+        'lottery_participants': [],
+        'max_players': session.max_players
+    }
     if session.players:
         out['players'] = json.loads(session.players)
     if session.waitlisted_players:
@@ -109,6 +116,8 @@ def session_to_dict(session):
     return out
 
 
+# TODO(shanel): This should be broken up into some helper methods - I worry it
+# might end up getting complicated and lead to missing things.
 def show_or_update_or_delete(communityname, sessionname):
     # Assume GOOGLE_APPLICATION_CREDENTIALS is set in environment
     client = ndb.Client()
@@ -117,22 +126,36 @@ def show_or_update_or_delete(communityname, sessionname):
         key = ndb.Key('Community', communityname, 'Session', sessionname)
         session = key.get()
         if session:
+            # TODO(shanel): We'll need to limit this to the creator only. (Or maybe community
+            # owner.)
             if flask.request.method == 'DELETE':
                 session.key.delete()
                 return flask.redirect(
                     flask.url_for('session.new', communityname=communityname))
             if flask.request.method == 'PUT':
-                # NOTE: This makes the assumption that the form will be filled with
-                # all the current data plus any changes.
-                altered = False
-                for k, v in flask.request.form.items():
-                    if k == 'id':
-                        continue
-                    if getattr(session, k, None) != None:
-                        altered = True
-                        setattr(session, k, v)
-                if altered:
-                    session.put()
+                if 'drop' in flask.request.args:
+                    try:
+                        drop_player_from_session(flask.request.form['caller'],
+                                                 communityname, sessionname)
+                    except ValueError as e:
+                        return (
+                            'problem encountered with request: {}'.format(e),
+                            400, {
+                                'Content-Type': 'text/plain; charset=utf-8'
+                            })
+                else:
+                    # NOTE: This makes the assumption that the form will be filled with
+                    # all the current data plus any changes.
+                    altered = False
+                    for k, v in flask.request.form.items():
+                        if k == 'id':
+                            continue
+                        if getattr(session, k, None) != None:
+                            altered = True
+                            setattr(session, k, v)
+                    if altered:
+                        session.put()
+            session = key.get()
             out = pprint.PrettyPrinter(indent=4).pformat(session)
             if 'json' in flask.request.args:
                 out = json.dumps(session_to_dict(session))
@@ -171,7 +194,7 @@ def run_a_single_lottery_draw(participants):
 
 
 def run_a_lottery(communityname, session):
-    lottery_id = session.name
+    lottery_id = communityname + '|' + session.name
     participant_ids = json.loads(session.lottery_participants)
     participant_keys = [ndb.Key('Player', sid) for sid in participant_ids]
     participants = ndb.get_multi(participant_keys)
@@ -229,3 +252,101 @@ def run_lotteries(communityname):
         len(sessions_with_unrun_lotteries)), 200, {
             'Content-Type': 'text/plain; charset=utf-8'
         }
+
+
+def drop_player_from_session(playername, communityname, sessionname):
+    """Drop a user from a session and perform all other necessary changes.
+
+    Args:
+      playername: the caller's username (the player who will be dropped)
+      communityname: the name of the community the session exists in.
+      sessionname: the name of the session the player is being dropped from.
+
+    Raises:
+      ValueError: if any of the args don't exist or the callername and the
+        playername do not match.
+    """
+    # TODO(shanel): Eventually there needs to be an actual auth check on the caller.
+    # Make sure the session exists
+    client = ndb.Client()
+    with client.context() as context:
+        # make sure the player exists
+        player_key = ndb.Key('Player', playername)
+        player = player_key.get()
+        if not player:
+            raise ValueError("%s does not exists in the player db" %
+                             playername)
+        key = ndb.Key('Community', communityname, 'Session', sessionname)
+        session = key.get()
+        if session:
+            # make sure the player is currently in the session
+            waitlist = []
+            if session.waitlisted_players:
+                waitlist = json.loads(session.waitlisted_players)
+            players = []
+            if session.players:
+                players = json.loads(session.players)
+            if playername in players:
+                # remove the player from the session
+                players.remove(playername)
+                # update the player's drop info
+                player_drops = {}
+                if player.sessions_dropped:
+                    player_drops = json.loads(player.sessions_dropped)
+                player_drops[communityname + '|' + sessionname] = str(
+                    datetime.datetime.utcnow())
+                player.sessions_dropped = json.dumps(player_drops)
+                player.put()
+                # update session's drops info
+                drops = {}
+                if session.drops:
+                    drops = json.loads(session.drops)
+                drops[playername] = str(datetime.datetime.utcnow())
+                session.drops = json.dumps(drops)
+                # move the person at the head of the waitlist into the session
+                if waitlist:
+                    promoted = waitlist.pop(0)
+                    promoted_key = ndb.Key('Player', promoted)
+                    promoted_player = promoted_key.get()
+                    if promoted_player:
+                        # update the promoted player's waitlist move info
+                        if promoted_player.sessions_waitlisted_for:
+                            wf = json.loads(
+                                promoted_player.sessions_waitlisted_for)
+                            if communityname + '|' + sessionname in wf:
+                                wf.remove(communityname + '|' + sessionname)
+                            promoted_player.sessions_waitlisted_for = json.dumps(
+                                wf)
+                        if promoted_player.sessions_via_waitlist:
+                            vw = json.loads(
+                                promoted_player.sessions_via_waitlist)
+                            vw[communityname + '|' + sessionname] = str(
+                                datetime.datetime.utcnow())
+                            promoted_player.sessions_via_waitlist = json.dumps(
+                                vw)
+                        promoted_player.put()
+                        session.waitlisted_players = json.dumps(waitlist)
+                        # update the session's moves_from_waitlist info
+                        moves = {}
+                        if session.moves_from_waitlist:
+                            moves = json.loads(session.moves_from_waitlist)
+                        moves[promoted_player.name] = str(
+                            datetime.datetime.utcnow())
+                        players.append(promoted)
+                        session.waitlisted_players = json.dumps(waitlist)
+                session.players = json.dumps(players)
+                session.put()
+            elif playername in waitlist:
+                waitlist.remove(playername)
+                wf = json.loads(player.sessions_waitlisted_for)
+                if communityname + '|' + sessionname in wf:
+                    wf.remove(communityname + '|' + sessionname)
+                player.sessions_waitlisted_for = json.dumps(wf)
+                session.waitlisted_players = json.dumps(waitlist)
+                session.put()
+                player.put()
+            else:
+                raise ValueError("%s not in session %v" %
+                                 (playername, sessionname))
+        else:
+            raise ValueError("session %s does not exist" % sessionname)
