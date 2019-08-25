@@ -191,7 +191,7 @@ def step_impl(context, players):
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
     resp_json = json.loads(resp.text)
     assert len(resp_json['players']) == int(
-        players), "want %s players enrolled; got %d" % (
+        players), "want %d players enrolled; got %d" % (
             int(players), len(resp_json['players']))
 
 
@@ -203,7 +203,7 @@ def step_impl(context, players):
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
     resp_json = json.loads(resp.text)
     assert len(resp_json['waitlisted_players']) == int(
-        players), "want %s players enrolled; got %d" % (
+        players), "want %d players on the waitlist; got %d" % (
             int(players), len(resp_json['waitlisted_players']))
 
 
@@ -275,3 +275,78 @@ def step_impl(context):
     assert dropper not in resp_json[
         'waitlisted_players'], "player %s is in %s" % (
             dropper, resp_json['waitlisted_players'])
+
+
+@given(u'a lottery has run before now with {participants} participants and a maximum of {maximum} players')
+def step_impl(context, participants, maximum):
+    set_names()
+    url = 'http://localhost:8080/communities'
+    resp = requests.post(url=url,
+                         data={
+                             'name': community_name,
+                             'policies': 'we-have-them'
+                         })
+    url = 'http://localhost:8080/%s' % community_name
+    resp = requests.get(url=url)
+    assert resp.status_code == 200, "want 200 for community; got %d" % resp.status_code
+    # Create the requisite number of players
+    parts = []
+    for i in range(0, int(participants)):
+        url = 'http://localhost:8080/players'
+        new_name = player_name + str(i)
+        resp = requests.post(url=url, data={'name': new_name})
+        url = 'http://localhost:8080/players/%s' % new_name
+        resp = requests.get(url=url)
+        assert resp.status_code == 200, "want 200; got %d" % resp.status_code
+        parts.append(new_name)
+    # Make sure it exists by trying to create it then fetching it.
+    url = 'http://localhost:8080/%s/sessions' % community_name
+    resp = requests.post(url=url,
+                         data={
+                             'name':
+                             session_name,
+                             'max_players':
+                             maximum,
+                             'lottery_participants':
+                             json.dumps(parts),
+                             'lottery_scheduled_for':
+                             datetime.datetime.utcnow() -
+                             datetime.timedelta(minutes=15)
+                         })
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
+    url = 'http://localhost:8080/%s/lotteries' % community_name
+    resp = requests.get(url=url)
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
+
+
+@when(u'a player signs up')
+def step_impl(context):
+    # create a new user
+    url = 'http://localhost:8080/players'
+    new_name = player_name + str(1337)
+    resp = requests.post(url=url, data={'name': new_name})
+    url = 'http://localhost:8080/players/%s' % new_name
+    resp = requests.get(url=url)
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
+    # get list of players in the session
+    url = 'http://localhost:8080/%s/sessions/%s?add=true&json=true' % (
+        community_name, session_name)
+    resp = requests.put(url=url, data={'caller': new_name})
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
+    url = 'http://localhost:8080/%s/sessions/%s?json=true' % (community_name,
+                                                              session_name)
+    resp = requests.get(url=url)
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
+    resp_json = json.loads(resp.text)
+    print(resp_json)
+
+@then(u'there are {new} participants')
+def step_impl(context, new):
+    url = 'http://localhost:8080/%s/sessions/%s?json=true' % (community_name,
+                                                              session_name)
+    resp = requests.get(url=url)
+    assert resp.status_code == 200, "want 200; got %d" % resp.status_code
+    resp_json = json.loads(resp.text)
+    assert len(resp_json['lottery_participants']
+               ) > 0, "want %s lottery participants; got %d" % (new, len(
+                   resp_json['lottery_participants']))
