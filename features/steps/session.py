@@ -277,7 +277,9 @@ def step_impl(context):
             dropper, resp_json['waitlisted_players'])
 
 
-@given(u'a lottery has run before now with {participants} participants and a maximum of {maximum} players')
+@given(
+    u'a lottery has run before now with {participants} participants and a maximum of {maximum} players'
+)
 def step_impl(context, participants, maximum):
     set_names()
     url = 'http://localhost:8080/communities'
@@ -340,6 +342,7 @@ def step_impl(context):
     resp_json = json.loads(resp.text)
     print(resp_json)
 
+
 @then(u'there are {new} participants')
 def step_impl(context, new):
     url = 'http://localhost:8080/%s/sessions/%s?json=true' % (community_name,
@@ -348,5 +351,5 @@ def step_impl(context, new):
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
     resp_json = json.loads(resp.text)
     assert len(resp_json['lottery_participants']
-               ) > 0, "want %s lottery participants; got %d" % (new, len(
-                   resp_json['lottery_participants']))
+               ) > 0, "want %s lottery participants; got %d" % (
+                   new, len(resp_json['lottery_participants']))

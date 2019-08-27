@@ -49,51 +49,50 @@ class Session(ndb.Model):
 def new(communityname):
     if flask.request.method == 'POST':
         sessionname = flask.request.form.get('name')
-        if sessionname == None:
+        if sessionname is None:
             return 'session or community name field missing', 400, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
-        else:
-            client = ndb.Client()
-            with client.context() as context:
-                community_key = ndb.Key('Community', communityname)
-                if community_key.get():
-                    key = ndb.Key('Community', communityname, 'Session',
-                                  sessionname)
-                    if not key.get():
-                        special = [
-                            'id', 'created', 'updated',
-                            'lottery_scheduled_for', 'lottery_occurred_at'
-                        ]
-                        params = {
-                            k: v
-                            for k, v in flask.request.form.items()
-                            if v and k not in special
-                        }
-                        # Things we can't just dump right in or want to disallow
-                        params['id'] = sessionname
-                        np = Session(parent=community_key, **params)
-                        if 'lottery_scheduled_for' in flask.request.form:
-                            np.lottery_scheduled_for = datetime.datetime.strptime(
-                                # '2019-08-10 21:04:01.217037'
-                                flask.request.form['lottery_scheduled_for'],
-                                '%Y-%m-%d %H:%M:%S.%f')
-                        key = np.put()
-                else:
-                    return 'could not find community {}'.format(
-                        communityname), 404, {
-                            'Content-Type': 'text/plain; charset=utf-8'
-                        }
+        client = ndb.Client()
+        with client.context() as context:
+            community_key = ndb.Key('Community', communityname)
+            if community_key.get():
+                key = ndb.Key('Community', communityname, 'Session',
+                              sessionname)
+                if not key.get():
+                    special = [
+                        'id', 'created', 'updated',
+                        'lottery_scheduled_for', 'lottery_occurred_at'
+                    ]
+                    params = {
+                        k: v
+                        for k, v in flask.request.form.items()
+                        if v and k not in special
+                    }
+                    # Things we can't just dump right in or want to disallow
+                    params['id'] = sessionname
+                    new_session = Session(parent=community_key, **params)
+                    if 'lottery_scheduled_for' in flask.request.form:
+                        new_session.lottery_scheduled_for = datetime.datetime.strptime(
+                            # '2019-08-10 21:04:01.217037'
+                            flask.request.form['lottery_scheduled_for'],
+                            '%Y-%m-%d %H:%M:%S.%f')
+                    key = new_session.put()
+            else:
+                return 'could not find community {}'.format(
+                    communityname), 404, {
+                        'Content-Type': 'text/plain; charset=utf-8'
+                    }
 
-            # It might be a pre-optimization, but ideally we'd just use the object
-            # to create the page and not do another lookup (lookups cost $)
-            #
-            # Also, if we try to do a create and a user with that name already
-            # exists (eventually) we'll want to return an error, not the data.
-            return flask.redirect(
-                flask.url_for('session.show_or_update_or_delete',
-                              communityname=communityname,
-                              sessionname=sessionname))
+        # It might be a pre-optimization, but ideally we'd just use the object
+        # to create the page and not do another lookup (lookups cost $)
+        #
+        # Also, if we try to do a create and a user with that name already
+        # exists (eventually) we'll want to return an error, not the data.
+        return flask.redirect(
+            flask.url_for('session.show_or_update_or_delete',
+                          communityname=communityname,
+                          sessionname=sessionname))
     if flask.request.method == 'GET':
         return 'CALENDAR GOES HERE', 200, {
             'Content-Type': 'text/plain; charset=utf-8'
@@ -172,11 +171,11 @@ def show_or_update_or_delete(communityname, sessionname):
             if 'json' in flask.request.args:
                 out = json.dumps(session_to_dict(session))
             return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
-        else:
-            return 'no session with name {} found in community {}'.format(
-                sessionname, communityname), 404, {
-                    'Content-Type': 'text/plain; charset=utf-8'
-                }
+
+        return 'no session with name {} found in community {}'.format(
+            sessionname, communityname), 404, {
+                'Content-Type': 'text/plain; charset=utf-8'
+            }
 
 
 def run_a_single_lottery_draw(participants):
@@ -237,6 +236,7 @@ def run_a_lottery(communityname, session):
         p.enter_lottery(lottery_id)
         h.exit_lottery()
     return winner_ids, waitlist_ids
+
 
 # TODO(shanel): This REALLY should just be *all* lotteries - otherwise we need
 # to know every single community and call /lotteries for each one.
@@ -371,7 +371,6 @@ def drop_player_from_session(playername, communityname, sessionname):
             raise ValueError("session %s does not exist" % sessionname)
 
 
-
 def add_player_to_session(playername, communityname, sessionname):
     """Add a user to a session and perform all other necessary changes.
 
@@ -428,9 +427,12 @@ def add_player_to_session(playername, communityname, sessionname):
                 session.lottery_participants = json.dumps(participants)
                 lotteries_signed_up_for = []
                 if player.lotteries_signed_up_for:
-                    lotteries_signed_up_for = json.loads(player.lotteries_signed_up_for)
-                lotteries_signed_up_for.append(communityname + '|' + sessionname)
-                player.lotteries_signed_up_for = json.dumps(lotteries_signed_up_for)
+                    lotteries_signed_up_for = json.loads(
+                        player.lotteries_signed_up_for)
+                lotteries_signed_up_for.append(communityname + '|' +
+                                               sessionname)
+                player.lotteries_signed_up_for = json.dumps(
+                    lotteries_signed_up_for)
                 player.put()
                 session.put()
             out = key.get()
