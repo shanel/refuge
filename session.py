@@ -38,6 +38,7 @@ class Session(ndb.Model):
     # These two I see as a dict of user id to timestamp
     drops = ndb.JsonProperty()
     moves_from_waitlist = ndb.JsonProperty()
+    session_started = ndb.BooleanProperty()
 
     # How to handle series and the neccesary lottery tweaks?
 
