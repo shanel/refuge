@@ -45,32 +45,31 @@ def new():
         # NOTE: This field will become the id for the entity - it can't be changed
         # without losing all the data.
         playername = flask.request.form.get('name')
-        if playername == None:
+        if not playername:
             return 'name field missing', 400, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
-        else:
-            client = ndb.Client()
-            with client.context() as context:
-                key = ndb.Key('Player', playername)
-                if not key.get():
-                    params = {
-                        k: v
-                        for k, v in flask.request.form.items()
-                        if v and k != 'id'
-                    }
-                    params['id'] = playername
-                    np = Player(**params)
-                    np.put()
+        client = ndb.Client()
+        with client.context() as context:
+            key = ndb.Key('Player', playername)
+            if not key.get():
+                params = {
+                    k: v
+                    for k, v in flask.request.form.items()
+                    if v and k != 'id'
+                }
+                params['id'] = playername
+                play = Player(**params)
+                play.put()
 
-            # It might be a pre-optimization, but ideally we'd just use the object
-            # to create the page and not do another lookup (lookups cost $)
-            #
-            # Also, if we try to do a create and a user with that name already
-            # exists (eventually) we'll want to return an error, not the data.
-            return flask.redirect(
-                flask.url_for('player.show_or_update_or_delete',
-                              playername=playername))
+        # It might be a pre-optimization, but ideally we'd just use the object
+        # to create the page and not do another lookup (lookups cost $)
+        #
+        # Also, if we try to do a create and a user with that name already
+        # exists (eventually) we'll want to return an error, not the data.
+        return flask.redirect(
+            flask.url_for('player.show_or_update_or_delete',
+                          playername=playername))
     if flask.request.method == 'GET':
         return 'NOPE', 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
@@ -93,14 +92,13 @@ def show_or_update_or_delete(playername):
                 for k, v in flask.request.form.items():
                     if k == 'id':
                         continue
-                    if getattr(player, k, None) != None:
+                    if getattr(player, k, None) is not None:
                         altered = True
                         setattr(player, k, v)
                 if altered:
                     player.put()
             out = pprint.PrettyPrinter(indent=4).pformat(player)
             return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
-        else:
-            return 'no user with name {} found'.format(playername), 404, {
-                'Content-Type': 'text/plain; charset=utf-8'
-            }
+        return 'no user with name {} found'.format(playername), 404, {
+            'Content-Type': 'text/plain; charset=utf-8'
+        }

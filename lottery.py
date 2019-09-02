@@ -9,7 +9,7 @@ class BaseUser(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def enter_lottery(self):
+    def enter_lottery(self, lottery_id):
         pass
 
     @abc.abstractmethod
@@ -17,7 +17,7 @@ class BaseUser(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def win_lottery(self):
+    def win_lottery(self, lottery_id):
         pass
 
     @abc.abstractmethod
@@ -41,8 +41,7 @@ def run_a_single_lottery_draw(users, ticket_holders):
             to_return.append(h)
     if len(to_return) == 1:
         return to_return[0][0]
-    else:
-        return random.choice(to_return)[0]
+    return random.choice(to_return)[0]
 
 
 def run_a_lottery_with_random_users(lottery,
@@ -53,13 +52,13 @@ def run_a_lottery_with_random_users(lottery,
                                     final=None):
     winners = []
     viable = users.keys()
-    if but_not != None:
+    if but_not is not None:
         viable = set(viable) - set(but_not)
     holders = random.sample(viable, holder_count)
     original_holders = holders
     for h in holders:
         users[h].enter_lottery(lottery)
-    for i in range(slots):
+    for _ in range(slots):
         winner = run_a_single_lottery_draw(users, holders)
         holders.remove(winner)
         winners += winner
@@ -67,6 +66,6 @@ def run_a_lottery_with_random_users(lottery,
         users[winner].win_lottery(lottery)
     for h in original_holders:
         users[h].exit_lottery()
-    if final != None:
+    if final is not None:
         final()
     return winners

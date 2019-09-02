@@ -1,9 +1,7 @@
 import datetime
 import json
-import logging
 import pprint
 import random
-import time
 
 import flask
 from google.cloud import ndb
@@ -129,6 +127,7 @@ def show_or_update_or_delete(communityname, sessionname):
         if session:
             # TODO(shanel): We'll need to limit this to the creator only. (Or maybe community
             # owner.)
+            # TODO(shanel): This will need to also remove the data from the players too.
             if flask.request.method == 'DELETE':
                 session.key.delete()
                 return flask.redirect(
@@ -161,7 +160,7 @@ def show_or_update_or_delete(communityname, sessionname):
                     for k, v in flask.request.form.items():
                         if k == 'id':
                             continue
-                        if getattr(session, k, None) != None:
+                        if getattr(session, k, None) is not None:
                             altered = True
                             setattr(session, k, v)
                     if altered:
@@ -200,8 +199,7 @@ def run_a_single_lottery_draw(participants):
             to_return.append(h)
     if len(to_return) == 1:
         return to_return[0][0]
-    else:
-        return random.choice(to_return)[0]
+    return random.choice(to_return)[0]
 
 
 def run_a_lottery(communityname, session):

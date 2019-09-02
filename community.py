@@ -19,32 +19,31 @@ def new():
         # NOTE: This field will become the id for the entity - it can't be changed
         # without losing all the data.
         communityname = flask.request.form.get('name')
-        if communityname == None:
+        if communityname is None:
             return 'name field missing', 400, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
-        else:
-            client = ndb.Client()
-            with client.context() as context:
-                key = ndb.Key('Community', communityname)
-                if not key.get():
-                    params = {
-                        k: v
-                        for k, v in flask.request.form.items()
-                        if v and k != 'id'
-                    }
-                    params['id'] = communityname
-                    np = Community(**params)
-                    np.put()
+        client = ndb.Client()
+        with client.context() as context:
+            key = ndb.Key('Community', communityname)
+            if not key.get():
+                params = {
+                    k: v
+                    for k, v in flask.request.form.items()
+                    if v and k != 'id'
+                }
+                params['id'] = communityname
+                comm = Community(**params)
+                comm.put()
 
-            # It might be a pre-optimization, but ideally we'd just use the object
-            # to create the page and not do another lookup (lookups cost $)
-            #
-            # Also, if we try to do a create and a user with that name already
-            # exists (eventually) we'll want to return an error, not the data.
-            return flask.redirect(
-                flask.url_for('community.show_or_update_or_delete',
-                              communityname=communityname))
+        # It might be a pre-optimization, but ideally we'd just use the object
+        # to create the page and not do another lookup (lookups cost $)
+        #
+        # Also, if we try to do a create and a user with that name already
+        # exists (eventually) we'll want to return an error, not the data.
+        return flask.redirect(
+            flask.url_for('community.show_or_update_or_delete',
+                          communityname=communityname))
     if flask.request.method == 'GET':
         return 'NOPE', 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
@@ -68,15 +67,14 @@ def show_or_update_or_delete(communityname):
                 for k, v in flask.request.form.items():
                     if k == 'id':
                         continue
-                    if getattr(community, k, None) != None:
+                    if getattr(community, k, None) is not None:
                         altered = True
                         setattr(community, k, v)
                 if altered:
                     community.put()
             out = pprint.PrettyPrinter(indent=4).pformat(community)
             return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
-        else:
-            return 'no community with name {} found'.format(
-                communityname), 404, {
-                    'Content-Type': 'text/plain; charset=utf-8'
-                }
+        return 'no community with name {} found'.format(
+            communityname), 404, {
+                'Content-Type': 'text/plain; charset=utf-8'
+            }

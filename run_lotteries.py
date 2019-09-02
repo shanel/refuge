@@ -25,10 +25,10 @@ def main():
     chunks = [alphabet[:10]]
     sub_alphabet = alphabet[10:]
 
-    while len(sub_alphabet) > 0:
+    while sub_alphabet:
         chunk = []
         for _ in range(random.randint(1, 5)):
-            if len(sub_alphabet) > 0:
+            if sub_alphabet:
                 chunk.append(sub_alphabet.pop(0))
         chunks.append(chunk)
 

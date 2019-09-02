@@ -9,18 +9,18 @@ class PercentageUser(lottery.BaseUser):
         self.wins = []
 
     def percentage(self):
-        if len(self.attempts) == 0:
-            return 0
-        return float(len(self.wins)) / float(len(self.attempts))
+        if self.attempts:
+            return float(len(self.wins)) / float(len(self.attempts))
+        return 0
 
-    def enter_lottery(self, lottery):
-        self.attempts.append(lottery)
+    def enter_lottery(self, lottery_id):
+        self.attempts.append(lottery_id)
 
     def exit_lottery(self):
         pass
 
-    def win_lottery(self, lottery):
-        self.wins.append(lottery)
+    def win_lottery(self, lottery_id):
+        self.wins.append(lottery_id)
 
     def get_rank(self):
         return self.percentage()
@@ -52,7 +52,7 @@ class PlayerMixIn():
         if self.lotteries_participated_in:
             lotteries_participated_in = json.loads(
                 self.lotteries_participated_in)
-        if len(lotteries_participated_in) == 0:
+        if not lotteries_participated_in:
             return 0.0
         lotteries_won = []
         if self.lotteries_won:
