@@ -5,4 +5,3 @@ indexes:
   properties:
   - name: lottery_occured_at
   - name: lottery_scheduled_for
-

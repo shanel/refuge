@@ -12,6 +12,8 @@ class Community(ndb.Model):
     policies = ndb.StringProperty()
     created = ndb.DateTimeProperty(auto_now_add=True)
     updated = ndb.DateTimeProperty(auto_now=True)
+    last_lottery_run_at = ndb.DateTimeProperty()
+    session_runs_updated_at = ndb.DateTimeProperty()
 
 
 def new():
