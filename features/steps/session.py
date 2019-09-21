@@ -340,7 +340,6 @@ def step_impl(context):
     resp = requests.get(url=url)
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
     resp_json = json.loads(resp.text)
-    print(resp_json)
 
 
 @then(u'there are {new} participants')

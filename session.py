@@ -458,6 +458,5 @@ def add_player_to_session(playername, communityname, sessionname):
                 player.put()
                 session.put()
             out = key.get()
-            print(out)
         else:
             raise ValueError("session %s does not exist" % sessionname)
