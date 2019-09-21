@@ -254,8 +254,6 @@ def run_lotteries():
         for s in sessions_with_unrun_lotteries:
             comm = s.key.parent().get()
             winner_ids, waitlist_ids = run_a_lottery(comm.name, s)
-            #sk = ndb.Key('Community', communityname, 'Session', s.name)
-            #s = sk.get()
             players = []
             if s.players:
                 players = json.loads(s.players)
@@ -392,6 +390,45 @@ def drop_player_from_session(playername, communityname, sessionname):
         else:
             raise ValueError("session %s does not exist" % sessionname)
 
+def _add_player_to_session(player, session, communityname, sessionname, playername):
+
+    # Check to see if the lottery has happened yet. If not, add the player
+    # as a participant.
+    # If the lottery has happened check if there is space in players. If
+    if session.lottery_occurred_at:
+        players = []
+        if session.players:
+            players = json.loads(session.players)
+        if len(players) < int(session.max_players):
+            players.append(playername)
+            session.players = json.dumps(players)
+        else:
+            waitlist = []
+            if session.waitlisted_players:
+                waitlist = json.loads(session.waitlisted_players)
+            waitlist.append(playername)
+            session.waitlisted_players = json.dumps(waitlist)
+            wf = []
+            if player.sessions_waitlisted_for:
+                wf = json.loads(player.sessions_waitlisted_for)
+            wf.append(communityname + '|' + sessionname)
+            player.sessions_waitlisted_for = json.dumps(wf)
+    else:
+        participants = []
+        if session.lottery_participants:
+            participants = json.loads(session.lottery_participants)
+        participants.append(playername)
+        session.lottery_participants = json.dumps(participants)
+        lotteries_signed_up_for = []
+        if player.lotteries_signed_up_for:
+            lotteries_signed_up_for = json.loads(
+                player.lotteries_signed_up_for)
+        lotteries_signed_up_for.append(communityname + '|' +
+                                       sessionname)
+        player.lotteries_signed_up_for = json.dumps(
+            lotteries_signed_up_for)
+
+    return player, session
 
 def add_player_to_session(playername, communityname, sessionname):
     """Add a user to a session and perform all other necessary changes.
@@ -418,45 +455,8 @@ def add_player_to_session(playername, communityname, sessionname):
         key = ndb.Key('Community', communityname, 'Session', sessionname)
         session = key.get()
         if session:
-            # Check to see if the lottery has happened yet. If not, add the player
-            # as a participant.
-            # If the lottery has happened check if there is space in players. If
-            if session.lottery_occurred_at:
-                players = []
-                if session.players:
-                    players = json.loads(session.players)
-                if len(players) < int(session.max_players):
-                    players.append(playername)
-                    session.players = json.dumps(players)
-                else:
-                    waitlist = []
-                    if session.waitlisted_players:
-                        waitlist = json.loads(session.waitlisted_players)
-                    waitlist.append(playername)
-                    session.waitlisted_players = json.dumps(waitlist)
-                    wf = []
-                    if player.sessions_waitlisted_for:
-                        wf = json.loads(player.sessions_waitlisted_for)
-                    wf.append(communityname + '|' + sessionname)
-                    player.sessions_waitlisted_for = json.dumps(wf)
-                    player.put()
-                session.put()
-            else:
-                participants = []
-                if session.lottery_participants:
-                    participants = json.loads(session.lottery_participants)
-                participants.append(playername)
-                session.lottery_participants = json.dumps(participants)
-                lotteries_signed_up_for = []
-                if player.lotteries_signed_up_for:
-                    lotteries_signed_up_for = json.loads(
-                        player.lotteries_signed_up_for)
-                lotteries_signed_up_for.append(communityname + '|' +
-                                               sessionname)
-                player.lotteries_signed_up_for = json.dumps(
-                    lotteries_signed_up_for)
-                player.put()
-                session.put()
-            out = key.get()
+            player, session = _add_player_to_session(player, session, communityname, sessionname, playername)
+            player.put()
+            session.put()
         else:
             raise ValueError("session %s does not exist" % sessionname)
