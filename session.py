@@ -240,25 +240,20 @@ def run_a_lottery(communityname, session):
     return winner_ids, waitlist_ids
 
 
-# TODO(shanel): This REALLY should just be *all* lotteries - otherwise we need
-# to know every single community and call /lotteries for each one.
-def run_lotteries(communityname):
+def run_lotteries():
     """Will run all the lotteries that need to be run.
-
-      Args:
-        communityname: the name of the community sessions are being checked for.
     """
     # Get all sessions which have unrun lotteries with lotteries scheduled for before now.
     client = ndb.Client()
     with client.context() as context:
-        community_key = ndb.Key('Community', communityname)
         sessions_with_unrun_lotteries = Session.query(
             Session.lottery_scheduled_for != None,
             Session.lottery_scheduled_for <= datetime.datetime.utcnow(),
             Session.lottery_occurred_at == None,
-            ancestor=community_key).fetch()
+            ).fetch()
         for s in sessions_with_unrun_lotteries:
-            winner_ids, waitlist_ids = run_a_lottery(communityname, s)
+            comm = s.key.parent().get()
+            winner_ids, waitlist_ids = run_a_lottery(comm.name, s)
             #sk = ndb.Key('Community', communityname, 'Session', s.name)
             #s = sk.get()
             players = []
@@ -269,9 +264,9 @@ def run_lotteries(communityname):
             s.waitlisted_players = json.dumps(waitlist_ids)
             s.lottery_occurred_at = datetime.datetime.utcnow()
             s.put()
-        comm = community_key.get()
-        comm.last_lottery_run_at = datetime.datetime.utcnow()
-        comm.put()
+            comm = s.key.parent().get()
+            comm.last_lottery_run_at = datetime.datetime.utcnow()
+            comm.put()
     return '{} lotteries run'.format(
         len(sessions_with_unrun_lotteries)), 200, {
             'Content-Type': 'text/plain; charset=utf-8'

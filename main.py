@@ -29,7 +29,7 @@ app.add_url_rule('/players/<playername>',
                  'player.show_or_update_or_delete',
                  player.show_or_update_or_delete,
                  methods=['PUT', 'GET', 'DELETE'])
-app.add_url_rule('/<communityname>/lotteries', 'session.run_lotteries',
+app.add_url_rule('/lotteries', 'session.run_lotteries',
                  session.run_lotteries)
 
 

@@ -178,7 +178,7 @@ def step_impl(context, participants, maximum):
 
 @when(u'we run the lottery')
 def step_impl(context):
-    url = 'http://localhost:8080/%s/lotteries' % community_name
+    url = 'http://localhost:8080/lotteries'
     resp = requests.get(url=url)
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
@@ -316,7 +316,7 @@ def step_impl(context, participants, maximum):
                              datetime.timedelta(minutes=15)
                          })
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
-    url = 'http://localhost:8080/%s/lotteries' % community_name
+    url = 'http://localhost:8080/lotteries'
     resp = requests.get(url=url)
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
 
