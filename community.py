@@ -2,22 +2,13 @@ import pprint
 from datetime import datetime
 
 import flask
-import db
 from pony import orm
+
+import refuge_types
+
 
 # TODO(shanel): We'll want to make sure Create/Update/Delete (ie not GET methods)
 # can only be called by the binary itself.
-
-
-class Community(db.refuge_db.Entity):
-    name = orm.PrimaryKey(str)
-    policies = orm.Optional(str, unique=True)
-    created = orm.Required(datetime)
-    updated = orm.Required(datetime)
-    last_lottery_run_at = orm.Optional(datetime)
-    session_runs_updated_at = orm.Optional(datetime)
-
-orm.sql_debug(True)
 
 
 @orm.db_session
@@ -30,7 +21,7 @@ def new():
             return 'name field missing', 400, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
-        if not orm.select(c for c in Community if c.name == communityname)[:]:
+        if not orm.select(c for c in refuge_types.Community if c.name == communityname)[:]:
             params = {
                 k: v
                 for k, v in flask.request.form.items()
@@ -39,7 +30,7 @@ def new():
             params['name'] = communityname
             params['created'] = datetime.now()
             params['updated'] = datetime.now()
-            Community(**params)
+            refuge_types.Community(**params)
 
         # It might be a pre-optimization, but ideally we'd just use the object
         # to create the page and not do another lookup (lookups cost $)
@@ -57,7 +48,7 @@ def new():
 @orm.db_session
 def show_or_update_or_delete(communityname):
 
-    results = orm.select(c for c in Community if c.name == communityname)[:]
+    results = orm.select(c for c in refuge_types.Community if c.name == communityname)[:]
     if results:
         community = results[0]  # names are unique so there sould only be one
         if flask.request.method == 'DELETE':

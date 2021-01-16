@@ -3,48 +3,12 @@ import pprint
 from datetime import datetime
 
 import flask
-import db
 from pony import orm
-import pprint
 
-import percentage
+import refuge_types
 
 # TODO(shanel): We'll want to make sure Create/Update/Delete (ie not GET methods)
 # can only be called by the binary itself.
-
-
-class Player(db.refuge_db.Entity, percentage.PlayerMixIn):
-    name = orm.PrimaryKey(str)
-    # ideally screen_name would be per community I assume?
-    screen_name = orm.Optional(str)
-    pronouns = orm.Optional(str)
-    created = orm.Required(datetime)
-    updated = orm.Required(datetime)
-
-    # A lot of these could feasibly be figured out via a query and minimize
-    # record keeping. Might be a cost ($$$) tradeoff there.
-    #
-    # lotteries signed up for
-    lotteries_signed_up_for = orm.Json
-    lotteries_participated_in = orm.Json
-    # lotteries won
-    lotteries_won = orm.Json
-    # games attended
-    sessions_played_in = orm.Json
-    # games waitlisted for
-    sessions_waitlisted_for = orm.Json
-    # These two I see as a dict of session id to timestamp
-    sessions_via_waitlist = orm.Json
-    sessions_dropped = orm.Json
-
-    def join_waitlist(self, lottery_id):
-        sessions_waitlisted_for = []
-        if self.sessions_waitlisted_for:
-            sessions_waitlisted_for = json.loads(self.sessions_waitlisted_for)
-        sessions_waitlisted_for.append(lottery_id)
-        self.sessions_waitlisted_for = json.dumps(sessions_waitlisted_for)
-
-orm.sql_debug(True)
 
 @orm.db_session
 def new():
@@ -54,7 +18,7 @@ def new():
             return 'name field missing', 400, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
-        if not orm.select(p for p in Player if p.name == playername)[:]:
+        if not orm.select(p for p in refuge_types.Player if p.name == playername)[:]:
             params = {
                 k: v
                 for k, v in flask.request.form.items()
@@ -63,7 +27,7 @@ def new():
             params['name'] = playername
             params['created'] = datetime.now()
             params['updated'] = datetime.now()
-            Player(**params)
+            refuge_types.Player(**params)
 
         # It might be a pre-optimization, but ideally we'd just use the object
         # to create the page and not do another lookup (lookups cost $)
@@ -79,7 +43,7 @@ def new():
 
 @orm.db_session
 def show_or_update_or_delete(playername):
-    results = orm.select(p for p in Player if p.name == playername)[:]
+    results = orm.select(p for p in refuge_types.Player if p.name == playername)[:]
     if results:
         player = results[0]  # names are unique so there sould only be one
         if flask.request.method == 'DELETE':

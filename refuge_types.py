@@ -13,7 +13,7 @@ class Community(db.refuge_db.Entity):
     updated = orm.Required(datetime)
     last_lottery_run_at = orm.Optional(datetime)
     session_runs_updated_at = orm.Optional(datetime)
-
+    sessions = orm.Set('Session')
 
 
 class Player(db.refuge_db.Entity, percentage.PlayerMixIn):
@@ -48,6 +48,7 @@ class Player(db.refuge_db.Entity, percentage.PlayerMixIn):
         self.sessions_waitlisted_for = json.dumps(sessions_waitlisted_for)
 
 class Session(db.refuge_db.Entity):
+    community = orm.Required(Community)
     # This probably should be a slug?
     name = orm.Required(str)
     # TODO(shanel): In theory this should be an int but all the data comes
