@@ -1,7 +1,0 @@
-indexes:
-
-- kind: Session
-  ancestor: yes
-  properties:
-  - name: lottery_occured_at
-  - name: lottery_scheduled_for
