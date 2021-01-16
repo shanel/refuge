@@ -1,3 +1,3 @@
 from pony import orm
 
-regfuge_db = orm.Database()
+refuge_db = orm.Database("sqlite", "refuge_testing.sqlite", create_db=True)
