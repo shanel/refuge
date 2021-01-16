@@ -1,21 +1,24 @@
 import pprint
+from datetime import datetime
 
 import flask
-from google.cloud import ndb
+import db
+from pony import orm
 
 # TODO(shanel): We'll want to make sure Create/Update/Delete (ie not GET methods)
 # can only be called by the binary itself.
 
 
-class Community(ndb.Model):
-    name = ndb.StringProperty()
-    policies = ndb.StringProperty()
-    created = ndb.DateTimeProperty(auto_now_add=True)
-    updated = ndb.DateTimeProperty(auto_now=True)
-    last_lottery_run_at = ndb.DateTimeProperty()
-    session_runs_updated_at = ndb.DateTimeProperty()
+class Community(db.refuge_db.Entity):
+    name = orm.Required(str, unique=True)
+    policies = orm.Optional(str, unique=True)
+    created = orm.Required(datetime)
+    updated = orm.Required(datetime)
+    last_lottery_run_at = orm.Optional(datetime)
+    session_runs_updated_at = orm.Optional(datetime)
 
 
+@db_session
 def new():
     if flask.request.method == 'POST':
         # NOTE: This field will become the id for the entity - it can't be changed
@@ -25,18 +28,14 @@ def new():
             return 'name field missing', 400, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
-        client = ndb.Client()
-        with client.context() as context:
-            key = ndb.Key('Community', communityname)
-            if not key.get():
-                params = {
-                    k: v
-                    for k, v in flask.request.form.items()
-                    if v and k != 'id'
-                }
-                params['id'] = communityname
-                comm = Community(**params)
-                comm.put()
+        if not orm.select(c for c in Community if c.name == communityname)[:]:
+            params = {
+                k: v
+                for k, v in flask.request.form.items()
+                if v and k != 'id'
+            }
+            params['id'] = communityname
+            Community(**params)
 
         # It might be a pre-optimization, but ideally we'd just use the object
         # to create the page and not do another lookup (lookups cost $)
