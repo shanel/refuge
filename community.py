@@ -18,7 +18,6 @@ class Community(db.refuge_db.Entity):
     session_runs_updated_at = orm.Optional(datetime)
 
 orm.sql_debug(True)
-db.refuge_db.generate_mapping(create_tables=True)
 
 
 @orm.db_session

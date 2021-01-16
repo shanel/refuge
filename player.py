@@ -1,8 +1,11 @@
 import json
 import pprint
+from datetime import datetime
 
 import flask
-from google.cloud import ndb
+import db
+from pony import orm
+import pprint
 
 import percentage
 
@@ -10,27 +13,29 @@ import percentage
 # can only be called by the binary itself.
 
 
-class Player(ndb.Model, percentage.PlayerMixIn):
-    name = ndb.StringProperty()
-    pronouns = ndb.StringProperty()
-    created = ndb.DateTimeProperty(auto_now_add=True)
-    updated = ndb.DateTimeProperty(auto_now=True)
+class Player(db.refuge_db.Entity, percentage.PlayerMixIn):
+    name = orm.PrimaryKey(str)
+    # ideally screen_name would be per community I assume?
+    screen_name = orm.Optional(str)
+    pronouns = orm.Optional(str)
+    created = orm.Required(datetime)
+    updated = orm.Required(datetime)
 
     # A lot of these could feasibly be figured out via a query and minimize
     # record keeping. Might be a cost ($$$) tradeoff there.
     #
     # lotteries signed up for
-    lotteries_signed_up_for = ndb.JsonProperty()
-    lotteries_participated_in = ndb.JsonProperty()
+    lotteries_signed_up_for = orm.Json
+    lotteries_participated_in = orm.Json
     # lotteries won
-    lotteries_won = ndb.JsonProperty()
+    lotteries_won = orm.Json
     # games attended
-    sessions_played_in = ndb.JsonProperty()
+    sessions_played_in = orm.Json
     # games waitlisted for
-    sessions_waitlisted_for = ndb.JsonProperty()
+    sessions_waitlisted_for = orm.Json
     # These two I see as a dict of session id to timestamp
-    sessions_via_waitlist = ndb.JsonProperty()
-    sessions_dropped = ndb.JsonProperty()
+    sessions_via_waitlist = orm.Json
+    sessions_dropped = orm.Json
 
     def join_waitlist(self, lottery_id):
         sessions_waitlisted_for = []
@@ -39,28 +44,26 @@ class Player(ndb.Model, percentage.PlayerMixIn):
         sessions_waitlisted_for.append(lottery_id)
         self.sessions_waitlisted_for = json.dumps(sessions_waitlisted_for)
 
+orm.sql_debug(True)
 
+@orm.db_session
 def new():
     if flask.request.method == 'POST':
-        # NOTE: This field will become the id for the entity - it can't be changed
-        # without losing all the data.
         playername = flask.request.form.get('name')
         if not playername:
             return 'name field missing', 400, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
-        client = ndb.Client()
-        with client.context() as context:
-            key = ndb.Key('Player', playername)
-            if not key.get():
-                params = {
-                    k: v
-                    for k, v in flask.request.form.items()
-                    if v and k != 'id'
-                }
-                params['id'] = playername
-                play = Player(**params)
-                play.put()
+        if not orm.select(p for p in Player if p.name == playername)[:]:
+            params = {
+                k: v
+                for k, v in flask.request.form.items()
+                if v and k != 'id'
+            }
+            params['name'] = playername
+            params['created'] = datetime.now()
+            params['updated'] = datetime.now()
+            Player(**params)
 
         # It might be a pre-optimization, but ideally we'd just use the object
         # to create the page and not do another lookup (lookups cost $)
@@ -74,31 +77,26 @@ def new():
         return 'NOPE', 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
 
+@orm.db_session
 def show_or_update_or_delete(playername):
-    # Assume GOOGLE_APPLICATION_CREDENTIALS is set in environment
-    client = ndb.Client()
-
-    with client.context() as context:
-        key = ndb.Key('Player', playername)
-        player = key.get()
-        if player:
-            if flask.request.method == 'DELETE':
-                player.key.delete()
-                return flask.redirect(flask.url_for('player.new'))
-            if flask.request.method == 'PUT':
-                # NOTE: This makes the assumption that the form will be filled with
-                # all the current data plus any changes.
-                altered = False
-                for k, v in flask.request.form.items():
-                    if k == 'id':
-                        continue
-                    if getattr(player, k, None) is not None:
-                        altered = True
-                        setattr(player, k, v)
-                if altered:
-                    player.put()
-            out = pprint.PrettyPrinter(indent=4).pformat(player)
-            return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    results = orm.select(p for p in Player if p.name == playername)[:]
+    if results:
+        player = results[0]  # names are unique so there sould only be one
+        if flask.request.method == 'DELETE':
+            player.delete()
+            return flask.redirect(flask.url_for('player.new'))
+        if flask.request.method == 'PUT':
+            # NOTE: This makes the assumption that the form will be filled with
+            # all the current data plus any changes.
+            for k, v in flask.request.form.items():
+                if k in ('id', 'name'):
+                    continue
+                if getattr(player, k, None) is not None:
+                    setattr(player, k, v)
+                    setattr(player, 'updated', datetime.now())
+        out = pprint.PrettyPrinter(indent=4).pformat(player)
+        return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    else:
         return 'no user with name {} found'.format(playername), 404, {
             'Content-Type': 'text/plain; charset=utf-8'
         }
