@@ -28,8 +28,8 @@ def new():
                 if v and k != 'id'
             }
             params['name'] = communityname
-            params['created'] = datetime.now()
-            params['updated'] = datetime.now()
+            params['created'] = datetime.utcnow()
+            params['updated'] = datetime.utcnow()
             refuge_types.Community(**params)
 
         # It might be a pre-optimization, but ideally we'd just use the object

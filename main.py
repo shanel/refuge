@@ -5,7 +5,7 @@ import flask
 import db
 import community
 import player
-#import session
+import session
 
 app = flask.Flask(__name__)
 
@@ -17,14 +17,14 @@ app.add_url_rule('/<communityname>',
                  'community.show_or_update_or_delete',
                  community.show_or_update_or_delete,
                  methods=['PUT', 'GET', 'DELETE'])
-#app.add_url_rule('/<communityname>/sessions',
-#                 'session.new',
-#                 session.new,
-#                 methods=['POST', 'GET'])
-#app.add_url_rule('/<communityname>/sessions/<sessionname>',
-#                 'session.show_or_update_or_delete',
-#                 session.show_or_update_or_delete,
-#                 methods=['PUT', 'GET', 'DELETE'])
+app.add_url_rule('/<communityname>/sessions',
+                 'session.new',
+                 session.new,
+                 methods=['POST', 'GET'])
+app.add_url_rule('/<communityname>/sessions/<sessionname>',
+                 'session.show_or_update_or_delete',
+                 session.show_or_update_or_delete,
+                 methods=['PUT', 'GET', 'DELETE'])
 app.add_url_rule('/players', 'player.new', player.new, methods=['POST', 'GET'])
 app.add_url_rule('/players/<playername>',
                  'player.show_or_update_or_delete',
