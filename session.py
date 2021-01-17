@@ -319,26 +319,32 @@ def drop_player_from_session(playername, communityname, sessionname):
             waitlist = []
             if session.waitlisted_players:
                 waitlist = list(orm.select(p for p in refuge_types.Player if p.name in json.loads(session.waitlisted_players)))
+                logging.warning("waitlist is %s", [p.name for p in waitlist])
             players = []
             if session.players:
                 players = list(orm.select(p for p in refuge_types.Player if p.name in json.loads(session.players)))
+                logging.warning("starting players %s", [p.name for p in players])
             try:
                 for p in players:
                     if p.name == playername:
                         players.remove(p)
                         break
 #                players.remove(playername)
+                session.flush()
                 # update the player's drop info
                 player = update_player_drop_data(player, communityname, sessionname)
+                player.flush()
                 # update session's drops info
                 session = update_session_drop_data(session, playername)
+                session.flush()
                 # move the person at the head of the waitlist into the session
                 if waitlist:
-                    promoted = waitlist.pop(0)
+                    promoted_player = waitlist.pop(0)
 #                    promoted_key = ndb.Key('Player', promoted)
 #                    promoted_player = promoted_key.get()
-                    promoted_player = waitlist.pop(0)
+#                    promoted = promoted_player.name
                     if promoted_player:
+                        logging.warning("%s promoted", promoted_player.name)
                         # update the promoted player's waitlist move info
                         promoted_player = update_promoted_players_waitlist_data(
                                 promoted_player, communityname, sessionname)
@@ -346,9 +352,12 @@ def drop_player_from_session(playername, communityname, sessionname):
 #                        promoted_player.put()
                         # update the session's moves_from_waitlist info
                         session, players = update_session_move_data(
-                                session, waitlist, promoted_player, promoted,
+                                session, waitlist, promoted_player, promoted_player,
+#                                session, waitlist, promoted_player, promoted,
                                 players)
-                session.players = json.dumps([p.name for p in players])
+                new_players = [p.name for p in players]
+                logging.warning("new players are %s", new_players)
+                session.players = json.dumps(new_players)
 #                session.put()
                 session.flush()
                 orm.commit()
