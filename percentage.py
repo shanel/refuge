@@ -1,4 +1,7 @@
 import json
+
+from pony import orm
+
 import lottery
 
 
@@ -34,8 +37,6 @@ class PlayerMixIn():
                 self.lotteries_participated_in)
         lotteries_participated_in.append(lottery_id)
         self.lotteries_participated_in = json.dumps(lotteries_participated_in)
-        # Assuming we only need to do the put at the end of the lottery?
-        # self.put()
 
     def win_lottery(self, lottery_id):
         lotteries_won = []
@@ -45,7 +46,8 @@ class PlayerMixIn():
         self.lotteries_won = json.dumps(lotteries_won)
 
     def exit_lottery(self):
-        self.put()
+        orm.commit()
+        pass
 
     def get_rank(self):
         lotteries_participated_in = []

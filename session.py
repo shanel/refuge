@@ -1,4 +1,5 @@
 import datetime
+import logging
 import json
 import pprint
 import random
@@ -175,18 +176,18 @@ def run_a_single_lottery_draw(participants):
         return to_return[0][0]
     return random.choice(to_return)[0]
 
-
+@orm.db_session
 def run_a_lottery(communityname, session):
     lottery_id = communityname + '|' + session.name
     participant_ids = json.loads(session.lottery_participants)
-    participant_keys = [ndb.Key('Player', sid) for sid in participant_ids]
-    participants = ndb.get_multi(participant_keys)
+    participants = list(orm.select(p for p in refuge_types.Player if p.name in participant_ids))
     winner_ids = []
     waitlist_ids = []
     original_participants = participants[:]
     for _ in range(0, int(session.max_players)):
         winner = run_a_single_lottery_draw(participants)
         if winner:
+            # Assuming this isn't removing the players from db?
             participants.remove(winner)
             winner_ids.append(winner.name)
     for _ in range(0, len(original_participants) - int(session.max_players)):
@@ -209,32 +210,25 @@ def run_a_lottery(communityname, session):
         h.exit_lottery()
     return winner_ids, waitlist_ids
 
-
+@orm.db_session
 def run_lotteries():
     """Will run all the lotteries that need to be run.
     """
     # Get all sessions which have unrun lotteries with lotteries scheduled for before now.
-    client = ndb.Client()
-    with client.context() as context:
-        sessions_with_unrun_lotteries = Session.query(
-            Session.lottery_scheduled_for != None,
-            Session.lottery_scheduled_for <= datetime.datetime.utcnow(),
-            Session.lottery_occurred_at == None,
-            ).fetch()
-        for s in sessions_with_unrun_lotteries:
-            comm = s.key.parent().get()
-            winner_ids, waitlist_ids = run_a_lottery(comm.name, s)
-            players = []
-            if s.players:
-                players = json.loads(s.players)
-            players.extend(winner_ids)
-            s.players = json.dumps(players)
-            s.waitlisted_players = json.dumps(waitlist_ids)
-            s.lottery_occurred_at = datetime.datetime.utcnow()
-            s.put()
-            comm = s.key.parent().get()
-            comm.last_lottery_run_at = datetime.datetime.utcnow()
-            comm.put()
+
+    results = orm.select(s for s in refuge_types.Session if s.lottery_scheduled_for != None)
+    results = orm.select(s for s in results if s.lottery_scheduled_for <= datetime.datetime.utcnow())
+    sessions_with_unrun_lotteries = orm.select(s for s in results if s.lottery_occurred_at == None)[:]
+    for s in sessions_with_unrun_lotteries:
+        winner_ids, waitlist_ids = run_a_lottery(s.community.name, s)
+        players = []
+        if s.players:
+            players = json.loads(s.players)
+        players.extend(winner_ids)
+        s.players = json.dumps(players)
+        s.waitlisted_players = json.dumps(waitlist_ids)
+        s.lottery_occurred_at = datetime.datetime.utcnow()
+        s.community.last_lottery_run_at = datetime.datetime.utcnow()
     return '{} lotteries run'.format(
         len(sessions_with_unrun_lotteries)), 200, {
             'Content-Type': 'text/plain; charset=utf-8'
@@ -254,6 +248,8 @@ def update_promoted_players_waitlist_data(promoted_player, communityname,
         vw[communityname + '|' + sessionname] = str(
             datetime.datetime.utcnow())
         promoted_player.sessions_via_waitlist = json.dumps(vw)
+    # for testing
+    orm.commit()
     return promoted_player
 
 def update_session_move_data(session, waitlist, promoted_player, promoted, players):
@@ -264,7 +260,7 @@ def update_session_move_data(session, waitlist, promoted_player, promoted, playe
     moves[promoted_player.name] = str(
         datetime.datetime.utcnow())
     players.append(promoted)
-    session.waitlisted_players = json.dumps(waitlist)
+    session.waitlisted_players = json.dumps([p.name for p in waitlist])
     session.moves_from_waitlist = json.dumps(moves)
     return session, players
 
@@ -322,19 +318,23 @@ def drop_player_from_session(playername, communityname, sessionname):
             # make sure the player is currently in the session
             waitlist = []
             if session.waitlisted_players:
-                waitlist = json.loads(session.waitlisted_players)
+                waitlist = list(orm.select(p for p in refuge_types.Player if p.name in json.loads(session.waitlisted_players)))
             players = []
             if session.players:
-                players = json.loads(session.players)
+                players = list(orm.select(p for p in refuge_types.Player if p.name in json.loads(session.players)))
             try:
-                players.remove(playername)
+                for p in players:
+                    if p.name == playername:
+                        players.remove(p)
+                        break
+#                players.remove(playername)
                 # update the player's drop info
                 player = update_player_drop_data(player, communityname, sessionname)
                 # update session's drops info
                 session = update_session_drop_data(session, playername)
                 # move the person at the head of the waitlist into the session
                 if waitlist:
-#                    promoted = waitlist.pop(0)
+                    promoted = waitlist.pop(0)
 #                    promoted_key = ndb.Key('Player', promoted)
 #                    promoted_player = promoted_key.get()
                     promoted_player = waitlist.pop(0)
@@ -342,28 +342,37 @@ def drop_player_from_session(playername, communityname, sessionname):
                         # update the promoted player's waitlist move info
                         promoted_player = update_promoted_players_waitlist_data(
                                 promoted_player, communityname, sessionname)
-                        promoted_player.put()
+#                        promoted_player.put()
                         # update the session's moves_from_waitlist info
                         session, players = update_session_move_data(
                                 session, waitlist, promoted_player, promoted,
                                 players)
-                session.players = json.dumps(players)
-                session.put()
-                return
+                session.players = json.dumps([p.name for p in players])
+#                session.put()
+                orm.commit()
             except ValueError:
+                logging.exception("first value error")
                 try:
-                    waitlist.remove(playername)
+                    for p in waitlist:
+                        if p.name == playername:
+                            waitlist.remove(p)
+                            break
+#                    waitlist.remove(playername)
                     wf = json.loads(player.sessions_waitlisted_for)
                     if communityname + '|' + sessionname in wf:
                         wf.remove(communityname + '|' + sessionname)
                     player.sessions_waitlisted_for = json.dumps(wf)
-                    session.waitlisted_players = json.dumps(waitlist)
+                    session.waitlisted_players = json.dumps([p.name for p in waitlist])
 #                    session.put()
 #                    player.put()
+                    orm.commit()
                 except ValueError:
+                    logging.exception("%s not in session %v" %
+                                     (playername, sessionname))
                     raise ValueError("%s not in session %v" %
                                      (playername, sessionname))
         else:
+            logging.exception("session %s does not exist" % sessionname)
             raise ValueError("session %s does not exist" % sessionname)
 
 def _add_player_to_session(player, session, communityname, sessionname, playername):

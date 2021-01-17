@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 
 from pony import orm
 
@@ -28,17 +29,17 @@ class Player(db.refuge_db.Entity, percentage.PlayerMixIn):
     # record keeping. Might be a cost ($$$) tradeoff there.
     #
     # lotteries signed up for
-    lotteries_signed_up_for = orm.Json
-    lotteries_participated_in = orm.Json
+    lotteries_signed_up_for = orm.Optional(orm.Json)
+    lotteries_participated_in = orm.Optional(orm.Json)
     # lotteries won
-    lotteries_won = orm.Json
+    lotteries_won = orm.Optional(orm.Json)
     # games attended
-    sessions_played_in = orm.Json
+    sessions_played_in = orm.Optional(orm.Json)
     # games waitlisted for
-    sessions_waitlisted_for = orm.Json
+    sessions_waitlisted_for = orm.Optional(orm.Json)
     # These two I see as a dict of session id to timestamp
-    sessions_via_waitlist = orm.Json
-    sessions_dropped = orm.Json
+    sessions_via_waitlist = orm.Optional(orm.Json)
+    sessions_dropped = orm.Optional(orm.Json)
 
     def join_waitlist(self, lottery_id):
         sessions_waitlisted_for = []
@@ -69,7 +70,7 @@ class Session(db.refuge_db.Entity):
     # TODO(shanel): Should this be required here? (Or shold we just require it in form?)
     starts_at = orm.Optional(datetime)
     # list of people in the session
-    players = orm.Json
+    players = orm.Optional(orm.Json)
     # list of people on the waitlist
     waitlisted_players = orm.Optional(orm.Json)
     # TODO(shanel): Should this be a relation?
