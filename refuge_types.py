@@ -55,6 +55,7 @@ class Session(db.refuge_db.Entity):
     # Hmm... So this ideally would be unique to the community it is a part of,
     # but it shouldn't need to be unique across all communities...
     name = orm.Required(str)
+    orm.PrimaryKey(community, name)
     # TODO(shanel): In theory this should be an int but all the data comes
     # in from the post as a string... Later we can do the needful and make
     # specific things into ints before sticking them into the datastore.

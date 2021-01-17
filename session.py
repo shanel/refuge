@@ -342,6 +342,7 @@ def drop_player_from_session(playername, communityname, sessionname):
                         # update the promoted player's waitlist move info
                         promoted_player = update_promoted_players_waitlist_data(
                                 promoted_player, communityname, sessionname)
+                        promoted_player.flush()
 #                        promoted_player.put()
                         # update the session's moves_from_waitlist info
                         session, players = update_session_move_data(
@@ -349,6 +350,7 @@ def drop_player_from_session(playername, communityname, sessionname):
                                 players)
                 session.players = json.dumps([p.name for p in players])
 #                session.put()
+                session.flush()
                 orm.commit()
             except ValueError:
                 logging.exception("first value error")
@@ -363,6 +365,8 @@ def drop_player_from_session(playername, communityname, sessionname):
                         wf.remove(communityname + '|' + sessionname)
                     player.sessions_waitlisted_for = json.dumps(wf)
                     session.waitlisted_players = json.dumps([p.name for p in waitlist])
+                    session.flush()
+                    player.flush()
 #                    session.put()
 #                    player.put()
                     orm.commit()

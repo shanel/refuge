@@ -46,6 +46,7 @@ class PlayerMixIn():
         self.lotteries_won = json.dumps(lotteries_won)
 
     def exit_lottery(self):
+        self.flush()
         orm.commit()
         pass
 
