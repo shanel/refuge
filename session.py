@@ -3,6 +3,7 @@ import logging
 import json
 import pprint
 import random
+import time
 
 import flask
 from pony import orm
@@ -78,7 +79,7 @@ def session_to_dict(session):
     out = {
         'name': session.name,
         'players': [],
-        'waitlisted_players': [],
+        'waitlisted_players': {},
         'lottery_participants': [],
         'max_players': session.max_players
     }
@@ -182,7 +183,7 @@ def run_a_lottery(communityname, session):
     participant_ids = json.loads(session.lottery_participants)
     participants = list(orm.select(p for p in refuge_types.Player if p.name in participant_ids))
     winner_ids = []
-    waitlist_ids = []
+    waitlist_ids = {}
     original_participants = participants[:]
     for _ in range(0, int(session.max_players)):
         winner = run_a_single_lottery_draw(participants)
@@ -194,13 +195,13 @@ def run_a_lottery(communityname, session):
         insertee = run_a_single_lottery_draw(participants)
         if insertee:
             participants.remove(insertee)
-            waitlist_ids.append(insertee.name)
+            waitlist_ids[time.time()] = insertee.name
     for winner in winner_ids:
         for p in original_participants:
             if winner == p.name:
                 p.win_lottery(lottery_id)
                 # TODO(shanel): This needs to setup the players entries in the session
-    for waiter in waitlist_ids:
+    for waiter in waitlist_ids.values():
         for p in original_participants:
             if waiter == p.name:
                 p.join_waitlist(lottery_id)
@@ -252,7 +253,7 @@ def update_promoted_players_waitlist_data(promoted_player, communityname,
     orm.commit()
     return promoted_player
 
-def update_session_move_data(session, waitlist, promoted_player, promoted, players):
+def update_session_move_data(session, waitlisted_players, promoted_player, promoted, players):
     # update the session's moves_from_waitlist info
     moves = {}
     if session.moves_from_waitlist:
@@ -260,7 +261,7 @@ def update_session_move_data(session, waitlist, promoted_player, promoted, playe
     moves[promoted_player.name] = str(
         datetime.datetime.utcnow())
     players.append(promoted)
-    session.waitlisted_players = json.dumps([p.name for p in waitlist])
+    session.waitlisted_players = json.dumps({k:v for k,v in waitlisted_players.items() if v != promoted_player.name})
     session.moves_from_waitlist = json.dumps(moves)
     return session, players
 
@@ -317,17 +318,21 @@ def drop_player_from_session(playername, communityname, sessionname):
             session = sessions[0]
             # make sure the player is currently in the session
             waitlist = []
+            waitlisted_players = json.loads(session.waitlisted_players)
             if session.waitlisted_players:
-                waitlist = list(orm.select(p for p in refuge_types.Player if p.name in json.loads(session.waitlisted_players)))
-                logging.warning("waitlist is %s", [p.name for p in waitlist])
+                waitlist = list(orm.select(p for p in refuge_types.Player if p.name in waitlisted_players.values()))
+                logging.warning("waitlist is %s", waitlisted_players)
             players = []
             if session.players:
                 players = list(orm.select(p for p in refuge_types.Player if p.name in json.loads(session.players)))
                 logging.warning("starting players %s", [p.name for p in players])
             try:
+                if playername not in (p.name for p in players):
+                    raise ValueError
                 for p in players:
                     if p.name == playername:
                         players.remove(p)
+                        player_removed_from_session = True
                         break
 #                players.remove(playername)
                 session.flush()
@@ -338,8 +343,13 @@ def drop_player_from_session(playername, communityname, sessionname):
                 session = update_session_drop_data(session, playername)
                 session.flush()
                 # move the person at the head of the waitlist into the session
-                if waitlist:
-                    promoted_player = waitlist.pop(0)
+                if waitlist and waitlisted_players and len(players) < int(session.max_players):
+                    first = list(sorted(waitlisted_players.keys()))[0]
+                    for pl in waitlist:
+                        if pl.name == waitlisted_players[first]:
+                            promoted_player = pl
+                            break
+#                    promoted_player = waitlist.pop(0)
 #                    promoted_key = ndb.Key('Player', promoted)
 #                    promoted_player = promoted_key.get()
 #                    promoted = promoted_player.name
@@ -352,7 +362,7 @@ def drop_player_from_session(playername, communityname, sessionname):
 #                        promoted_player.put()
                         # update the session's moves_from_waitlist info
                         session, players = update_session_move_data(
-                                session, waitlist, promoted_player, promoted_player,
+                                session, waitlisted_players, promoted_player, promoted_player,
 #                                session, waitlist, promoted_player, promoted,
                                 players)
                 new_players = [p.name for p in players]
@@ -364,6 +374,10 @@ def drop_player_from_session(playername, communityname, sessionname):
             except ValueError:
                 logging.exception("first value error")
                 try:
+                    # TODO(shanel) raising exceptons inside a try is stupid
+                    if playername not in (p.name for p in waitlist):
+                        raise ValueError
+                    logging.exception("old waitlist: %s", [p.name for p in waitlist])
                     for p in waitlist:
                         if p.name == playername:
                             waitlist.remove(p)
@@ -373,7 +387,9 @@ def drop_player_from_session(playername, communityname, sessionname):
                     if communityname + '|' + sessionname in wf:
                         wf.remove(communityname + '|' + sessionname)
                     player.sessions_waitlisted_for = json.dumps(wf)
-                    session.waitlisted_players = json.dumps([p.name for p in waitlist])
+                    logging.exception("new waitlist: %s", [p.name for p in waitlist])
+                    new_waitlisted_players = {k:v for k,v in waitlisted_players.items() if v in (p.name for p in waitlist)}
+                    session.waitlisted_players = json.dumps(new_waitlisted_players)
                     session.flush()
                     player.flush()
 #                    session.put()
@@ -401,11 +417,12 @@ def _add_player_to_session(player, session, communityname, sessionname, playerna
             players.append(playername)
             session.players = json.dumps(players)
         else:
-            waitlist = []
+            waitlist = {}
             if session.waitlisted_players:
                 waitlist = json.loads(session.waitlisted_players)
-            waitlist.append(playername)
+            waitlist[time.time()] = playername
             session.waitlisted_players = json.dumps(waitlist)
+#            session.waitlisted_players = json.dumps(waitlist, sort_keys=True)
             wf = []
             if player.sessions_waitlisted_for:
                 wf = json.loads(player.sessions_waitlisted_for)
