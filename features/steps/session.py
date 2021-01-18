@@ -209,7 +209,7 @@ def step_impl(context, players):
 
 # Session Drops
 
-original_waitlist = []
+original_waitlist = {}
 
 
 @when(u'a player drops the session')
@@ -248,9 +248,10 @@ def step_impl(context):
         resp_json['players']) > 0, "want > 0 players enrolled; got %d" % (len(
             resp_json['players']))
     global original_waitlist
-    assert original_waitlist[0] in resp_json[
-        'players'], "player %s not in %s" % (original_waitlist[0],
-                                             resp_json['players'])
+    sorted_waitlist_keys = sorted(original_waitlist.keys())
+    assert original_waitlist[sorted_waitlist_keys[0]] in resp_json[
+        'players'], "player %s not in %s (%s)" % (original_waitlist[sorted_waitlist_keys[0]],
+                                             resp_json['players'], sorted_waitlist_keys)
 
 
 @when(u'a player drops from the waitlist')
@@ -266,15 +267,19 @@ def step_impl(context):
     global original_waitlist
     original_waitlist = resp_json['waitlisted_players']
     # pick one and send drop request
-    dropper = resp_json['waitlisted_players'][0]
+    players = resp_json['waitlisted_players'].keys()
+    for i in players:
+        dropper = resp_json['waitlisted_players'][i]
+        break
+#    dropper = resp_json['waitlisted_players'][players[0]]
     url = 'http://localhost:8080/%s/sessions/%s?drop=true&json=true' % (
         community_name, session_name)
     resp = requests.put(url=url, data={'caller': dropper})
     assert resp.status_code == 200, "want 200; got %d" % resp.status_code
     resp_json = json.loads(resp.text)
     assert dropper not in resp_json[
-        'waitlisted_players'], "player %s is in %s" % (
-            dropper, resp_json['waitlisted_players'])
+        'waitlisted_players'].values(), "player %s is in %s" % (
+            dropper, resp_json['waitlisted_players'].values())
 
 
 @given(

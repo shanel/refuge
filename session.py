@@ -2,11 +2,15 @@ import datetime
 import json
 import pprint
 import random
+import time
 
 import flask
-from google.cloud import ndb
+from pony import orm
+
+import refuge_types
 
 
+# TODO(shanel): id might not be sacred anymore
 PROTECTED_CREATION_ATTRIBUTES = [
     'id', 'created', 'updated',
     'lottery_scheduled_for', 'lottery_occurred_at'
@@ -16,41 +20,10 @@ PROTECTED_CREATION_ATTRIBUTES = [
 # can only be called by the binary itself.
 
 
-class Session(ndb.Model):
-    name = ndb.StringProperty()
-    # TODO(shanel): In theory this should be an int but all the data comes
-    # in from the post as a string... Later we can do the needful and make
-    # specific things into ints before sticking them into the datastore.
-    max_players = ndb.StringProperty()
-    min_players = ndb.StringProperty()
-    # list of people signed up for lottery
-    lottery_participants = ndb.JsonProperty()
-    # when the lottery should happen
-    lottery_scheduled_for = ndb.DateTimeProperty()
-    # when lottery happened
-    lottery_occurred_at = ndb.DateTimeProperty()
-    # datetime of the session
-    starts_at = ndb.DateTimeProperty()
-    # list of people in the session
-    players = ndb.JsonProperty()
-    # list of people on the waitlist
-    waitlisted_players = ndb.JsonProperty()
-    created_by = ndb.StringProperty()
-    other_sessions_in_series = ndb.JsonProperty()
-    give_preference_to_those_who_can_attend_most_sessions = ndb.BooleanProperty(
-    )
-    created = ndb.DateTimeProperty(auto_now_add=True)
-    updated = ndb.DateTimeProperty(auto_now=True)
-    # These two I see as a dict of user id to timestamp
-    drops = ndb.JsonProperty()
-    moves_from_waitlist = ndb.JsonProperty()
-    session_started = ndb.BooleanProperty()
-
-    # How to handle series and the neccesary lottery tweaks?
-
-
 # TODO(shanel): Need to handle initial players - which must update
-# those players with the fact that they are in a new game.
+# those players with the fact that they are in a new game. (Should
+# handle situation where non-site-member is in the list.)
+@orm.db_session
 def new(communityname):
     if flask.request.method == 'POST':
         sessionname = flask.request.form.get('name')
@@ -58,27 +31,29 @@ def new(communityname):
             return 'session or community name field missing', 400, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
-        client = ndb.Client()
-        with client.context() as context:
             community_key = ndb.Key('Community', communityname)
-            if community_key.get():
-                key = ndb.Key('Community', communityname, 'Session',
-                              sessionname)
-                if not key.get():
-                    params = {
-                        k: v
-                        for k, v in flask.request.form.items()
-                        if v and k not in PROTECTED_CREATION_ATTRIBUTES
-                    }
-                    # Things we can't just dump right in or want to disallow
-                    params['id'] = sessionname
-                    new_session = Session(parent=community_key, **params)
-                    if 'lottery_scheduled_for' in flask.request.form:
-                        new_session.lottery_scheduled_for = datetime.datetime.strptime(
-                            # '2019-08-10 21:04:01.217037'
-                            flask.request.form['lottery_scheduled_for'],
-                            '%Y-%m-%d %H:%M:%S.%f')
-                    key = new_session.put()
+        results = orm.select(c for c in refuge_types.Community if c.name == communityname)[:]
+        if results:
+            # Names should be unique.
+            community = results[0]
+            # This feels inefficient...
+            if sessionname not in (s.name for s in community.sessions):
+                params = {
+                    k: v
+                    for k, v in flask.request.form.items()
+                    if v and k not in PROTECTED_CREATION_ATTRIBUTES
+                }
+                # Things we can't just dump right in or want to disallow
+                params['name'] = sessionname
+                if 'lottery_scheduled_for' in flask.request.form:
+                    params['lottery_scheduled_for'] = datetime.datetime.strptime(
+                        # '2019-08-10 21:04:01.217037'
+                        flask.request.form['lottery_scheduled_for'],
+                        '%Y-%m-%d %H:%M:%S.%f')
+                params['community'] = community
+                params['created'] = datetime.datetime.utcnow()
+                params['updated'] = datetime.datetime.utcnow()
+                refuge_types.Session(**params)
             else:
                 return 'could not find community {}'.format(
                     communityname), 404, {
@@ -105,7 +80,7 @@ def session_to_dict(session):
     out = {
         'name': session.name,
         'players': [],
-        'waitlisted_players': [],
+        'waitlisted_players': {},
         'lottery_participants': [],
         'max_players': session.max_players
     }
@@ -120,19 +95,22 @@ def session_to_dict(session):
 
 # TODO(shanel): This should be broken up into some helper methods - I worry it
 # might end up getting complicated and lead to missing things.
+@orm.db_session
 def show_or_update_or_delete(communityname, sessionname):
-    # Assume GOOGLE_APPLICATION_CREDENTIALS is set in environment
-    client = ndb.Client()
+    results = orm.select(c for c in refuge_types.Community if c.name == communityname)[:]
+    if results:
+        # Names should be unique.
+        community = results[0]
+        # This feels inefficient...
+        sessions = [s for s in community.sessions if s.name == sessionname]
+        if sessions:
+            session = sessions[0]
 
-    with client.context() as context:
-        key = ndb.Key('Community', communityname, 'Session', sessionname)
-        session = key.get()
-        if session:
             # TODO(shanel): We'll need to limit this to the creator only. (Or maybe community
             # owner.)
             # TODO(shanel): This will need to also remove the data from the players too.
             if flask.request.method == 'DELETE':
-                session.key.delete()
+                session.delete()
                 return flask.redirect(
                     flask.url_for('session.new', communityname=communityname))
             if flask.request.method == 'PUT':
@@ -159,16 +137,11 @@ def show_or_update_or_delete(communityname, sessionname):
                 else:
                     # NOTE: This makes the assumption that the form will be filled with
                     # all the current data plus any changes.
-                    altered = False
                     for k, v in flask.request.form.items():
                         if k in ('id', 'created', 'updated'):
                             continue
                         if getattr(session, k, None) is not None:
-                            altered = True
                             setattr(session, k, v)
-                    if altered:
-                        session.put()
-            session = key.get()
             # This should be removed once we are even remotely live.
             out = pprint.PrettyPrinter(indent=4).pformat(session)
             if 'json' in flask.request.args:
@@ -205,31 +178,31 @@ def run_a_single_lottery_draw(participants):
         return to_return[0][0]
     return random.choice(to_return)[0]
 
-
+@orm.db_session
 def run_a_lottery(communityname, session):
     lottery_id = communityname + '|' + session.name
     participant_ids = json.loads(session.lottery_participants)
-    participant_keys = [ndb.Key('Player', sid) for sid in participant_ids]
-    participants = ndb.get_multi(participant_keys)
+    participants = list(orm.select(p for p in refuge_types.Player if p.name in participant_ids))
     winner_ids = []
-    waitlist_ids = []
+    waitlist_ids = {}
     original_participants = participants[:]
     for _ in range(0, int(session.max_players)):
         winner = run_a_single_lottery_draw(participants)
         if winner:
+            # Assuming this isn't removing the players from db?
             participants.remove(winner)
             winner_ids.append(winner.name)
     for _ in range(0, len(original_participants) - int(session.max_players)):
         insertee = run_a_single_lottery_draw(participants)
         if insertee:
             participants.remove(insertee)
-            waitlist_ids.append(insertee.name)
+            waitlist_ids[time.time()] = insertee.name
     for winner in winner_ids:
         for p in original_participants:
             if winner == p.name:
                 p.win_lottery(lottery_id)
                 # TODO(shanel): This needs to setup the players entries in the session
-    for waiter in waitlist_ids:
+    for waiter in waitlist_ids.values():
         for p in original_participants:
             if waiter == p.name:
                 p.join_waitlist(lottery_id)
@@ -239,32 +212,25 @@ def run_a_lottery(communityname, session):
         h.exit_lottery()
     return winner_ids, waitlist_ids
 
-
+@orm.db_session
 def run_lotteries():
     """Will run all the lotteries that need to be run.
     """
     # Get all sessions which have unrun lotteries with lotteries scheduled for before now.
-    client = ndb.Client()
-    with client.context() as context:
-        sessions_with_unrun_lotteries = Session.query(
-            Session.lottery_scheduled_for != None,
-            Session.lottery_scheduled_for <= datetime.datetime.utcnow(),
-            Session.lottery_occurred_at == None,
-            ).fetch()
-        for s in sessions_with_unrun_lotteries:
-            comm = s.key.parent().get()
-            winner_ids, waitlist_ids = run_a_lottery(comm.name, s)
-            players = []
-            if s.players:
-                players = json.loads(s.players)
-            players.extend(winner_ids)
-            s.players = json.dumps(players)
-            s.waitlisted_players = json.dumps(waitlist_ids)
-            s.lottery_occurred_at = datetime.datetime.utcnow()
-            s.put()
-            comm = s.key.parent().get()
-            comm.last_lottery_run_at = datetime.datetime.utcnow()
-            comm.put()
+
+    results = orm.select(s for s in refuge_types.Session if s.lottery_scheduled_for != None)
+    results = orm.select(s for s in results if s.lottery_scheduled_for <= datetime.datetime.utcnow())
+    sessions_with_unrun_lotteries = orm.select(s for s in results if s.lottery_occurred_at == None)[:]
+    for s in sessions_with_unrun_lotteries:
+        winner_ids, waitlist_ids = run_a_lottery(s.community.name, s)
+        players = []
+        if s.players:
+            players = json.loads(s.players)
+        players.extend(winner_ids)
+        s.players = json.dumps(players)
+        s.waitlisted_players = json.dumps(waitlist_ids)
+        s.lottery_occurred_at = datetime.datetime.utcnow()
+        s.community.last_lottery_run_at = datetime.datetime.utcnow()
     return '{} lotteries run'.format(
         len(sessions_with_unrun_lotteries)), 200, {
             'Content-Type': 'text/plain; charset=utf-8'
@@ -284,9 +250,10 @@ def update_promoted_players_waitlist_data(promoted_player, communityname,
         vw[communityname + '|' + sessionname] = str(
             datetime.datetime.utcnow())
         promoted_player.sessions_via_waitlist = json.dumps(vw)
+    # for testing
     return promoted_player
 
-def update_session_move_data(session, waitlist, promoted_player, promoted, players):
+def update_session_move_data(session, waitlisted_players, promoted_player, promoted, players):
     # update the session's moves_from_waitlist info
     moves = {}
     if session.moves_from_waitlist:
@@ -294,7 +261,7 @@ def update_session_move_data(session, waitlist, promoted_player, promoted, playe
     moves[promoted_player.name] = str(
         datetime.datetime.utcnow())
     players.append(promoted)
-    session.waitlisted_players = json.dumps(waitlist)
+    session.waitlisted_players = json.dumps({k:v for k,v in waitlisted_players.items() if v != promoted_player.name})
     session.moves_from_waitlist = json.dumps(moves)
     return session, players
 
@@ -318,6 +285,7 @@ def update_player_drop_data(player, communityname, sessionname):
     return player
 
 
+@orm.db_session
 def drop_player_from_session(playername, communityname, sessionname):
     """Drop a user from a session and perform all other necessary changes.
 
@@ -327,66 +295,74 @@ def drop_player_from_session(playername, communityname, sessionname):
       sessionname: the name of the session the player is being dropped from.
 
     Raises:
-      ValueError: if any of the args don't exist or the callername and the
-        playername do not match.
+      ValueError: if any of the args don't exist
     """
     # TODO(shanel): Eventually there needs to be an actual auth check on the caller.
     # Make sure the session exists
-    client = ndb.Client()
-    with client.context() as context:
-        # make sure the player exists
-        player_key = ndb.Key('Player', playername)
-        player = player_key.get()
-        if not player:
-            raise ValueError("%s does not exists in the player db" %
-                             playername)
-        key = ndb.Key('Community', communityname, 'Session', sessionname)
-        session = key.get()
-        if session:
+
+    player_results = orm.select(p for p in refuge_types.Player if p.name == playername)[:]
+    if player_results:
+        # Names should be unique.
+        player = player_results[0]
+    else:
+        raise ValueError("%s does not exists in the player db" %
+                         playername)
+    results = orm.select(c for c in refuge_types.Community if c.name == communityname)[:]
+    if results:
+        # Names should be unique.
+        community = results[0]
+        # This feels inefficient...
+        sessions = [s for s in community.sessions if s.name == sessionname]
+        if sessions:
+            session = sessions[0]
             # make sure the player is currently in the session
             waitlist = []
+            waitlisted_players = json.loads(session.waitlisted_players)
             if session.waitlisted_players:
-                waitlist = json.loads(session.waitlisted_players)
+                waitlist = list(orm.select(p for p in refuge_types.Player if p.name in waitlisted_players.values()))
             players = []
             if session.players:
-                players = json.loads(session.players)
-            try:
-                players.remove(playername)
+                players = list(orm.select(p for p in refuge_types.Player if p.name in json.loads(session.players)))
+            if playername in (p.name for p in players):
+                for p in players:
+                    if p.name == playername:
+                        players.remove(p)
+                        player_removed_from_session = True
+                        break
                 # update the player's drop info
                 player = update_player_drop_data(player, communityname, sessionname)
-                player.put()
                 # update session's drops info
                 session = update_session_drop_data(session, playername)
                 # move the person at the head of the waitlist into the session
-                if waitlist:
-                    promoted = waitlist.pop(0)
-                    promoted_key = ndb.Key('Player', promoted)
-                    promoted_player = promoted_key.get()
+                if waitlist and waitlisted_players and len(players) < int(session.max_players):
+                    first = list(sorted(waitlisted_players.keys()))[0]
+                    for pl in waitlist:
+                        if pl.name == waitlisted_players[first]:
+                            promoted_player = pl
+                            break
                     if promoted_player:
                         # update the promoted player's waitlist move info
                         promoted_player = update_promoted_players_waitlist_data(
                                 promoted_player, communityname, sessionname)
-                        promoted_player.put()
                         # update the session's moves_from_waitlist info
                         session, players = update_session_move_data(
-                                session, waitlist, promoted_player, promoted,
+                                session, waitlisted_players, promoted_player, promoted_player,
                                 players)
-                session.players = json.dumps(players)
-                session.put()
-                return
-            except ValueError:
-                try:
-                    waitlist.remove(playername)
-                    wf = json.loads(player.sessions_waitlisted_for)
-                    if communityname + '|' + sessionname in wf:
-                        wf.remove(communityname + '|' + sessionname)
-                    player.sessions_waitlisted_for = json.dumps(wf)
-                    session.waitlisted_players = json.dumps(waitlist)
-                    session.put()
-                    player.put()
-                except ValueError:
-                    raise ValueError("%s not in session %v" %
-                                     (playername, sessionname))
+                new_players = [p.name for p in players]
+                session.players = json.dumps(new_players)
+            elif playername in (p.name for p in waitlist):
+                for p in waitlist:
+                    if p.name == playername:
+                        waitlist.remove(p)
+                        break
+                wf = json.loads(player.sessions_waitlisted_for)
+                if communityname + '|' + sessionname in wf:
+                    wf.remove(communityname + '|' + sessionname)
+                player.sessions_waitlisted_for = json.dumps(wf)
+                new_waitlisted_players = {k:v for k,v in waitlisted_players.items() if v in (p.name for p in waitlist)}
+                session.waitlisted_players = json.dumps(new_waitlisted_players)
+            else:
+                raise ValueError("%s not in session %v" % (playername, sessionname))
         else:
             raise ValueError("session %s does not exist" % sessionname)
 
@@ -403,10 +379,10 @@ def _add_player_to_session(player, session, communityname, sessionname, playerna
             players.append(playername)
             session.players = json.dumps(players)
         else:
-            waitlist = []
+            waitlist = {}
             if session.waitlisted_players:
                 waitlist = json.loads(session.waitlisted_players)
-            waitlist.append(playername)
+            waitlist[time.time()] = playername
             session.waitlisted_players = json.dumps(waitlist)
             wf = []
             if player.sessions_waitlisted_for:
@@ -430,6 +406,7 @@ def _add_player_to_session(player, session, communityname, sessionname, playerna
 
     return player, session
 
+@orm.db_session
 def add_player_to_session(playername, communityname, sessionname):
     """Add a user to a session and perform all other necessary changes.
 
@@ -444,19 +421,21 @@ def add_player_to_session(playername, communityname, sessionname):
     """
     # TODO(shanel): Eventually there needs to be an actual auth check on the caller.
     # Make sure the session exists
-    client = ndb.Client()
-    with client.context() as context:
-        # make sure the player exists
-        player_key = ndb.Key('Player', playername)
-        player = player_key.get()
-        if not player:
-            raise ValueError("%s does not exists in the player db" %
-                             playername)
-        key = ndb.Key('Community', communityname, 'Session', sessionname)
-        session = key.get()
-        if session:
+    player_results = orm.select(p for p in refuge_types.Player if p.name == playername)[:]
+    if player_results:
+        # Names should be unique.
+        player = player_results[0]
+    else:
+        raise ValueError("%s does not exists in the player db" %
+                         playername)
+    results = orm.select(c for c in refuge_types.Community if c.name == communityname)[:]
+    if results:
+        # Names should be unique.
+        community = results[0]
+        # This feels inefficient...
+        sessions = [s for s in community.sessions if s.name == sessionname]
+        if sessions:
+            session = sessions[0]
             player, session = _add_player_to_session(player, session, communityname, sessionname, playername)
-            player.put()
-            session.put()
         else:
             raise ValueError("session %s does not exist" % sessionname)

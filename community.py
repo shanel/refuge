@@ -1,21 +1,17 @@
 import pprint
+from datetime import datetime
 
 import flask
-from google.cloud import ndb
+from pony import orm
+
+import refuge_types
+
 
 # TODO(shanel): We'll want to make sure Create/Update/Delete (ie not GET methods)
 # can only be called by the binary itself.
 
 
-class Community(ndb.Model):
-    name = ndb.StringProperty()
-    policies = ndb.StringProperty()
-    created = ndb.DateTimeProperty(auto_now_add=True)
-    updated = ndb.DateTimeProperty(auto_now=True)
-    last_lottery_run_at = ndb.DateTimeProperty()
-    session_runs_updated_at = ndb.DateTimeProperty()
-
-
+@orm.db_session
 def new():
     if flask.request.method == 'POST':
         # NOTE: This field will become the id for the entity - it can't be changed
@@ -25,18 +21,16 @@ def new():
             return 'name field missing', 400, {
                 'Content-Type': 'text/plain; charset=utf-8'
             }
-        client = ndb.Client()
-        with client.context() as context:
-            key = ndb.Key('Community', communityname)
-            if not key.get():
-                params = {
-                    k: v
-                    for k, v in flask.request.form.items()
-                    if v and k != 'id'
-                }
-                params['id'] = communityname
-                comm = Community(**params)
-                comm.put()
+        if not orm.select(c for c in refuge_types.Community if c.name == communityname)[:]:
+            params = {
+                k: v
+                for k, v in flask.request.form.items()
+                if v and k != 'id'
+            }
+            params['name'] = communityname
+            params['created'] = datetime.utcnow()
+            params['updated'] = datetime.utcnow()
+            refuge_types.Community(**params)
 
         # It might be a pre-optimization, but ideally we'd just use the object
         # to create the page and not do another lookup (lookups cost $)
@@ -51,31 +45,27 @@ def new():
 
 
 # TODO(shanel): Should it be possible to delete communities?
+@orm.db_session
 def show_or_update_or_delete(communityname):
-    # Assume GOOGLE_APPLICATION_CREDENTIALS is set in environment
-    client = ndb.Client()
 
-    with client.context() as context:
-        key = ndb.Key('Community', communityname)
-        community = key.get()
-        if community:
-            if flask.request.method == 'DELETE':
-                community.key.delete()
-                return flask.redirect(flask.url_for('community.new'))
-            if flask.request.method == 'PUT':
-                # NOTE: This makes the assumption that the form will be filled with
-                # all the current data plus any changes.
-                altered = False
-                for k, v in flask.request.form.items():
-                    if k == 'id':
-                        continue
-                    if getattr(community, k, None) is not None:
-                        altered = True
-                        setattr(community, k, v)
-                if altered:
-                    community.put()
-            out = pprint.PrettyPrinter(indent=4).pformat(community)
-            return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    results = orm.select(c for c in refuge_types.Community if c.name == communityname)[:]
+    if results:
+        community = results[0]  # names are unique so there sould only be one
+        if flask.request.method == 'DELETE':
+            community.delete()
+            return flask.redirect(flask.url_for('community.new'))
+        if flask.request.method == 'PUT':
+            # NOTE: This makes the assumption that the form will be filled with
+            # all the current data plus any changes.
+            for k, v in flask.request.form.items():
+                if k in ('id', 'name'):
+                    continue
+                if getattr(community, k, None) is not None:
+                    setattr(community, k, v)
+                    setattr(community, 'updated', datetime.now())
+        out = pprint.PrettyPrinter(indent=4).pformat(community)
+        return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    else:
         return 'no community with name {} found'.format(
             communityname), 404, {
                 'Content-Type': 'text/plain; charset=utf-8'
