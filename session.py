@@ -293,8 +293,7 @@ def drop_player_from_session(playername, communityname, sessionname):
       sessionname: the name of the session the player is being dropped from.
 
     Raises:
-      ValueError: if any of the args don't exist or the callername and the
-        playername do not match.
+      ValueError: if any of the args don't exist
     """
     # TODO(shanel): Eventually there needs to be an actual auth check on the caller.
     # Make sure the session exists

@@ -6,7 +6,6 @@ from pony import orm
 import db
 import percentage
 
-
 class Community(db.refuge_db.Entity):
     name = orm.PrimaryKey(str)
     policies = orm.Optional(str)
@@ -28,7 +27,7 @@ class Player(db.refuge_db.Entity, percentage.PlayerMixIn):
     # A lot of these could feasibly be figured out via a query and minimize
     # record keeping. Might be a cost ($$$) tradeoff there.
     #
-    # lotteries signed up for - would link to Session.lottery_participants
+    # lotteries signed up for
     lotteries_signed_up_for = orm.Optional(orm.Json)
     lotteries_participated_in = orm.Optional(orm.Json)
     # lotteries won
@@ -60,7 +59,7 @@ class Session(db.refuge_db.Entity):
     # specific things into ints before sticking them into the datastore.
     max_players = orm.Optional(str)
     min_players = orm.Optional(str)
-    # list of people signed up for lottery - would link to Player.lotteries_signed_up_for
+    # list of people signed up for lottery
     lottery_participants = orm.Optional(orm.Json)
     # when the lottery should happen
     lottery_scheduled_for = orm.Optional(datetime)
