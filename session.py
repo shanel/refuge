@@ -10,6 +10,7 @@ from pony import orm
 import refuge_types
 
 
+# TODO(shanel): id might not be sacred anymore
 PROTECTED_CREATION_ATTRIBUTES = [
     'id', 'created', 'updated',
     'lottery_scheduled_for', 'lottery_occurred_at'
@@ -20,7 +21,8 @@ PROTECTED_CREATION_ATTRIBUTES = [
 
 
 # TODO(shanel): Need to handle initial players - which must update
-# those players with the fact that they are in a new game.
+# those players with the fact that they are in a new game. (Should
+# handle situation where non-site-member is in the list.)
 @orm.db_session
 def new(communityname):
     if flask.request.method == 'POST':

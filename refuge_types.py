@@ -17,6 +17,7 @@ class Community(db.refuge_db.Entity):
 
 
 class Player(db.refuge_db.Entity, percentage.PlayerMixIn):
+    # TODO(shanel): Figure out if name maybe should be something else? (email, etc.)
     name = orm.PrimaryKey(str)
     # ideally screen_name would be per community I assume?
     screen_name = orm.Optional(str)
@@ -83,6 +84,7 @@ class Session(db.refuge_db.Entity):
     drops = orm.Optional(orm.Json)
     moves_from_waitlist = orm.Optional(orm.Json)
     session_started = orm.Optional(bool)
+    show_lottery_participants_before_lottery_run = orm.Optional(bool)
 
     # How to handle series and the neccesary lottery tweaks?
 
