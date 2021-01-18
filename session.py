@@ -322,9 +322,7 @@ def drop_player_from_session(playername, communityname, sessionname):
             players = []
             if session.players:
                 players = list(orm.select(p for p in refuge_types.Player if p.name in json.loads(session.players)))
-            try:
-                if playername not in (p.name for p in players):
-                    raise ValueError
+            if playername in (p.name for p in players):
                 for p in players:
                     if p.name == playername:
                         players.remove(p)
@@ -351,24 +349,19 @@ def drop_player_from_session(playername, communityname, sessionname):
                                 players)
                 new_players = [p.name for p in players]
                 session.players = json.dumps(new_players)
-            except ValueError:
-                try:
-                    # TODO(shanel) raising exceptons inside a try is stupid
-                    if playername not in (p.name for p in waitlist):
-                        raise ValueError
-                    for p in waitlist:
-                        if p.name == playername:
-                            waitlist.remove(p)
-                            break
-                    wf = json.loads(player.sessions_waitlisted_for)
-                    if communityname + '|' + sessionname in wf:
-                        wf.remove(communityname + '|' + sessionname)
-                    player.sessions_waitlisted_for = json.dumps(wf)
-                    new_waitlisted_players = {k:v for k,v in waitlisted_players.items() if v in (p.name for p in waitlist)}
-                    session.waitlisted_players = json.dumps(new_waitlisted_players)
-                except ValueError:
-                    raise ValueError("%s not in session %v" %
-                                     (playername, sessionname))
+            elif playername in (p.name for p in waitlist):
+                for p in waitlist:
+                    if p.name == playername:
+                        waitlist.remove(p)
+                        break
+                wf = json.loads(player.sessions_waitlisted_for)
+                if communityname + '|' + sessionname in wf:
+                    wf.remove(communityname + '|' + sessionname)
+                player.sessions_waitlisted_for = json.dumps(wf)
+                new_waitlisted_players = {k:v for k,v in waitlisted_players.items() if v in (p.name for p in waitlist)}
+                session.waitlisted_players = json.dumps(new_waitlisted_players)
+            else:
+                raise ValueError("%s not in session %v" % (playername, sessionname))
         else:
             raise ValueError("session %s does not exist" % sessionname)
 
