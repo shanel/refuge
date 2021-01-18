@@ -1,5 +1,4 @@
 import datetime
-import logging
 import json
 import pprint
 import random
@@ -250,7 +249,6 @@ def update_promoted_players_waitlist_data(promoted_player, communityname,
             datetime.datetime.utcnow())
         promoted_player.sessions_via_waitlist = json.dumps(vw)
     # for testing
-    orm.commit()
     return promoted_player
 
 def update_session_move_data(session, waitlisted_players, promoted_player, promoted, players):
@@ -321,11 +319,9 @@ def drop_player_from_session(playername, communityname, sessionname):
             waitlisted_players = json.loads(session.waitlisted_players)
             if session.waitlisted_players:
                 waitlist = list(orm.select(p for p in refuge_types.Player if p.name in waitlisted_players.values()))
-                logging.warning("waitlist is %s", waitlisted_players)
             players = []
             if session.players:
                 players = list(orm.select(p for p in refuge_types.Player if p.name in json.loads(session.players)))
-                logging.warning("starting players %s", [p.name for p in players])
             try:
                 if playername not in (p.name for p in players):
                     raise ValueError
@@ -334,14 +330,10 @@ def drop_player_from_session(playername, communityname, sessionname):
                         players.remove(p)
                         player_removed_from_session = True
                         break
-#                players.remove(playername)
-                session.flush()
                 # update the player's drop info
                 player = update_player_drop_data(player, communityname, sessionname)
-                player.flush()
                 # update session's drops info
                 session = update_session_drop_data(session, playername)
-                session.flush()
                 # move the person at the head of the waitlist into the session
                 if waitlist and waitlisted_players and len(players) < int(session.max_players):
                     first = list(sorted(waitlisted_players.keys()))[0]
@@ -349,59 +341,35 @@ def drop_player_from_session(playername, communityname, sessionname):
                         if pl.name == waitlisted_players[first]:
                             promoted_player = pl
                             break
-#                    promoted_player = waitlist.pop(0)
-#                    promoted_key = ndb.Key('Player', promoted)
-#                    promoted_player = promoted_key.get()
-#                    promoted = promoted_player.name
                     if promoted_player:
-                        logging.warning("%s promoted", promoted_player.name)
                         # update the promoted player's waitlist move info
                         promoted_player = update_promoted_players_waitlist_data(
                                 promoted_player, communityname, sessionname)
-                        promoted_player.flush()
-#                        promoted_player.put()
                         # update the session's moves_from_waitlist info
                         session, players = update_session_move_data(
                                 session, waitlisted_players, promoted_player, promoted_player,
-#                                session, waitlist, promoted_player, promoted,
                                 players)
                 new_players = [p.name for p in players]
-                logging.warning("new players are %s", new_players)
                 session.players = json.dumps(new_players)
-#                session.put()
-                session.flush()
-                orm.commit()
             except ValueError:
-                logging.exception("first value error")
                 try:
                     # TODO(shanel) raising exceptons inside a try is stupid
                     if playername not in (p.name for p in waitlist):
                         raise ValueError
-                    logging.exception("old waitlist: %s", [p.name for p in waitlist])
                     for p in waitlist:
                         if p.name == playername:
                             waitlist.remove(p)
                             break
-#                    waitlist.remove(playername)
                     wf = json.loads(player.sessions_waitlisted_for)
                     if communityname + '|' + sessionname in wf:
                         wf.remove(communityname + '|' + sessionname)
                     player.sessions_waitlisted_for = json.dumps(wf)
-                    logging.exception("new waitlist: %s", [p.name for p in waitlist])
                     new_waitlisted_players = {k:v for k,v in waitlisted_players.items() if v in (p.name for p in waitlist)}
                     session.waitlisted_players = json.dumps(new_waitlisted_players)
-                    session.flush()
-                    player.flush()
-#                    session.put()
-#                    player.put()
-                    orm.commit()
                 except ValueError:
-                    logging.exception("%s not in session %v" %
-                                     (playername, sessionname))
                     raise ValueError("%s not in session %v" %
                                      (playername, sessionname))
         else:
-            logging.exception("session %s does not exist" % sessionname)
             raise ValueError("session %s does not exist" % sessionname)
 
 def _add_player_to_session(player, session, communityname, sessionname, playername):
@@ -422,7 +390,6 @@ def _add_player_to_session(player, session, communityname, sessionname, playerna
                 waitlist = json.loads(session.waitlisted_players)
             waitlist[time.time()] = playername
             session.waitlisted_players = json.dumps(waitlist)
-#            session.waitlisted_players = json.dumps(waitlist, sort_keys=True)
             wf = []
             if player.sessions_waitlisted_for:
                 wf = json.loads(player.sessions_waitlisted_for)
