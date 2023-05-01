@@ -1,4 +1,4 @@
 behave==1.2.6
-Flask==1.0.2
+Flask==2.3.2
 gunicorn==19.9.0
 pony==0.7.14
